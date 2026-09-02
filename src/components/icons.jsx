@@ -167,3 +167,66 @@ export function AlertTriangleIcon(props) {
     </svg>
   );
 }
+
+export function MessageSquareIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+export function SendIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </svg>
+  );
+}
+
+export function UserIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+export function ClockIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+export function PowerIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+      <line x1="12" y1="2" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+export function PowerOffIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M18.36 6.64A9 9 0 0 0 12 2" />
+      <path d="M12 2v10" />
+      <path d="M18.36 6.64A9 9 0 1 1 5.64 6.64" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
+  );
+}
+
+export function LoaderIcon(props) {
+  return (
+    <svg {...defaults} {...props}>
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}

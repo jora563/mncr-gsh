@@ -8,29 +8,73 @@ const authUrl = () => `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-
 const tokenUrl = () => `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
 const logoutUrl = () => `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`;
 
-/** Декодирует payload JWT без проверки подписи — нам нужны только claims (exp). */
-function parseJwtPayload(token) {
+/**
+ * Декодирование JWT токена для извлечения payload
+ */
+function decodeJWT(token) {
   try {
-    const [, payload] = token.split('.');
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64));
-  } catch {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1]));
+  } catch (error) {
+    console.error('Ошибка декодирования JWT:', error);
     return null;
   }
 }
 
-/** True, если токен протух или протухнет в ближайшие bufferSec секунд. */
-function isExpiringSoon(token, bufferSec = 60) {
-  const payload = parseJwtPayload(token);
-  if (!payload?.exp) return true;
-  return payload.exp * 1000 < Date.now() + bufferSec * 1000;
+/**
+ * Проверка истечения срока действия токена (с запасом 30 секунд)
+ */
+function isExpiringSoon(token) {
+  const payload = decodeJWT(token);
+  if (!payload || !payload.exp) return true;
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp - now < 30;
+}
+
+/**
+ * Извлечение ролей из JWT токена
+ */
+function extractRoles(token) {
+  const payload = decodeJWT(token);
+  if (!payload) return [];
+
+  const roles = [];
+
+  // Realm roles
+  if (payload.realm_access?.roles) {
+    roles.push(...payload.realm_access.roles);
+  }
+
+  // Client roles
+  if (payload.resource_access) {
+    Object.values(payload.resource_access).forEach((client) => {
+      if (client.roles) {
+        roles.push(...client.roles);
+      }
+    });
+  }
+
+  // Кастомное поле role (строка или массив) — используется в этой конфигурации Keycloak
+  if (payload.role) {
+    if (Array.isArray(payload.role)) {
+      roles.push(...payload.role);
+    } else {
+      roles.push(payload.role);
+    }
+  }
+
+  return [...new Set(roles)];
 }
 
 export const keycloak = {
   /** Старт OAuth2 Authorization Code Flow: редирект на страницу логина Keycloak. */
-  login() {
+  login(redirectTo) {
     const state = crypto.randomUUID();
     sessionStorage.setItem('oauth_state', state);
+    if (redirectTo) {
+      sessionStorage.setItem('login_redirect_to', redirectTo);
+    }
 
     const params = new URLSearchParams({
       client_id: KEYCLOAK_CLIENT_ID,
@@ -81,6 +125,10 @@ export const keycloak = {
     if (tokens.refresh_token) sessionStorage.setItem('refresh_token', tokens.refresh_token);
     // id_token нужен для корректного RP-initiated logout
     if (tokens.id_token) sessionStorage.setItem('id_token', tokens.id_token);
+
+    const redirectTo = sessionStorage.getItem('login_redirect_to');
+    sessionStorage.removeItem('login_redirect_to');
+    return redirectTo;
   },
 
   getToken() {
@@ -147,5 +195,28 @@ export const keycloak = {
 
   isAuthenticated() {
     return Boolean(this.getToken());
+  },
+
+  /**
+   * Получение ролей текущего пользователя из токена
+   */
+  getRoles() {
+    const token = this.getToken();
+    if (!token) return [];
+    return extractRoles(token);
+  },
+
+  /**
+   * Проверка наличия конкретной роли у пользователя
+   */
+  hasRole(role) {
+    return this.getRoles().includes(role);
+  },
+
+  /**
+   * Проверка, является ли пользователем оператором
+   */
+  isOperator() {
+    return this.hasRole('operator');
   },
 };

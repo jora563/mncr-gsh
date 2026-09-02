@@ -16,7 +16,9 @@ export default function CallbackPage() {
 
     keycloak
       .handleCallback()
-      .then(() => navigate('/admin', { replace: true }))
+      .then((redirectTo) => {
+        navigate(redirectTo || '/admin', { replace: true });
+      })
       .catch((err) => {
         console.error('OAuth callback failed:', err);
         setError(err?.message ?? String(err));

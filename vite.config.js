@@ -20,7 +20,22 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: {
-        '/v1': { target, changeOrigin: true },
+        // ws: true — без этого Vite не проксирует WebSocket-апгрейды.
+        // Браузер не может послать Authorization при WS-handshake, поэтому
+        // фронтенд шлёт токен в ?token=, а прокси перекладывает его в заголовок.
+        '/v1': {
+          target,
+          changeOrigin: true,
+          ws: true,
+          configure: (proxy) => {
+            proxy.on('proxyReqWs', (proxyReq, req) => {
+              const token = new URL(req.url, 'http://localhost').searchParams.get('token');
+              if (token) {
+                proxyReq.setHeader('Authorization', `Bearer ${token}`);
+              }
+            });
+          },
+        },
         '/health': { target, changeOrigin: true },
       },
     },
