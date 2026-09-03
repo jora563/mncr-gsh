@@ -1,26 +1,56 @@
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ThemeProvider from './providers/theme/ThemeProvider.jsx'
 import ToastProvider from './providers/toast/ToastProvider.jsx'
 import HomePage from './pages/HomePage.jsx'
 import AdminPage from './pages/AdminPage.jsx'
 import OperatorPage from './pages/OperatorPage.jsx'
-import LoginPage from './pages/LoginPage.jsx'
 import CallbackPage from './pages/CallbackPage.jsx'
 import { keycloak } from './services/keycloak.js'
 
+/**
+ * Отказ в доступе по роли: полный logout (сбрасывает SSO-сессию Keycloak).
+ * После logout Keycloak редиректит на главную, где можно войти другим пользователем.
+ */
+function ForbiddenRedirect({ message }) {
+  const handled = useRef(false)
+
+  useEffect(() => {
+    if (handled.current) return
+    handled.current = true
+    // Сохраняем сообщение для отображения после возврата
+    sessionStorage.setItem('forbidden_message', message)
+    // Полный logout: сбрасывает SSO-сессию Keycloak, редиректит на главную
+    keycloak.logout()
+  }, [message])
+
+  return null
+}
+
+/**
+ * Админ-панель: только роль admin
+ */
 function ProtectedRoute({ children }) {
   if (!keycloak.isAuthenticated()) {
-    return <Navigate to="/login" replace />
+    keycloak.login()
+    return null
+  }
+  if (!keycloak.hasRole('admin')) {
+    return <ForbiddenRedirect message="Доступ запрещён: требуется роль администратора" />
   }
   return children
 }
 
+/**
+ * Панель оператора: только роль operator
+ */
 function OperatorRoute({ children }) {
   if (!keycloak.isAuthenticated()) {
-    return <Navigate to="/login" replace />
+    keycloak.login()
+    return null
   }
-  if (!keycloak.isOperator()) {
-    return <Navigate to="/" replace />
+  if (!keycloak.hasRole('operator')) {
+    return <ForbiddenRedirect message="Доступ запрещён: требуется роль оператора" />
   }
   return children
 }
@@ -32,7 +62,6 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
             <Route path="/callback" element={<CallbackPage />} />
             <Route
               path="/admin"
@@ -50,6 +79,7 @@ export default function App() {
                 </OperatorRoute>
               }
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </ToastProvider>

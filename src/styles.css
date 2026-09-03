@@ -933,17 +933,6 @@ tr.expanded-parent .expand-toggle { transform: rotate(90deg); color: var(--prima
   width: 100%;
 }
 
-.auth-hint {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-  text-align: center;
-}
-
-.auth-hint--error {
-  color: var(--danger);
-}
-
 /* ============ АДАПТИВНОСТЬ (ОПЕРАТОР) ============ */
 @media (max-width: 768px) {
   .operator-sidebar {

@@ -1,18 +1,18 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useOperatorChat } from '../hooks/useOperatorChat.js';
-import { keycloak } from '../services/keycloak.js';
-import { WS_CONNECTION_STATUS } from '../services/websocket.js';
-import ChatHeader from '../components/chat/ChatHeader.jsx';
-import ChatMessages from '../components/chat/ChatMessages.jsx';
-import ChatInput from '../components/chat/ChatInput.jsx';
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useOperatorChat } from '../hooks/useOperatorChat.js'
+import { keycloak } from '../services/keycloak.js'
+import { WS_CONNECTION_STATUS } from '../services/websocket.js'
+import ChatHeader from '../components/chat/ChatHeader.jsx'
+import ChatMessages from '../components/chat/ChatMessages.jsx'
+import ChatInput from '../components/chat/ChatInput.jsx'
 import {
   LogOutIcon,
   MessageSquareIcon,
   ClockIcon,
   PowerIcon,
   PowerOffIcon
-} from '../components/icons.jsx';
+} from '../components/icons.jsx'
 
 /**
  * Статусы оператора
@@ -20,10 +20,10 @@ import {
 const OPERATOR_STATUSES = {
   ONLINE: 1,
   OFFLINE: 0,
-};
+}
 
 export default function OperatorPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   const {
     connectionStatus,
     currentChatId,
@@ -40,45 +40,45 @@ export default function OperatorPage() {
     loadHistory,
     closeChat,
     changeStatus,
-  } = useOperatorChat();
+  } = useOperatorChat()
 
   /**
    * Проверка авторизации при монтировании
    */
   useEffect(() => {
     if (!keycloak.isAuthenticated()) {
-      navigate('/login');
-      return;
+      keycloak.login()
+      return
     }
 
     if (!keycloak.isOperator()) {
       // Если нет роли оператора, редиректим на главную
-      navigate('/');
-      return;
+      navigate('/')
+      return
     }
 
     // Автоматическое подключение при загрузке
-    connect();
+    connect()
 
     return () => {
-      disconnect();
-    };
-  }, [navigate, connect, disconnect]);
+      disconnect()
+    }
+  }, [navigate, connect, disconnect])
 
   /**
    * Обработка выхода
    */
   const handleLogout = () => {
-    disconnect();
-    keycloak.logout();
-  };
+    disconnect()
+    keycloak.logout()
+  }
 
   /**
    * Обработка отправки сообщения
    */
   const handleSendMessage = (text) => {
-    sendMessage(text);
-  };
+    sendMessage(text)
+  }
 
   /**
    * Переключение статуса оператора
@@ -86,9 +86,9 @@ export default function OperatorPage() {
   const handleToggleStatus = () => {
     const newStatus = operatorStatus === OPERATOR_STATUSES.ONLINE
       ? OPERATOR_STATUSES.OFFLINE
-      : OPERATOR_STATUSES.ONLINE;
-    changeStatus(newStatus);
-  };
+      : OPERATOR_STATUSES.ONLINE
+    changeStatus(newStatus)
+  }
 
   /**
    * Рендер статуса подключения
@@ -111,17 +111,17 @@ export default function OperatorPage() {
         label: 'Ошибка',
         className: 'status-badge--error',
       },
-    };
+    }
 
-    const config = statusConfig[connectionStatus] || statusConfig[WS_CONNECTION_STATUS.DISCONNECTED];
+    const config = statusConfig[connectionStatus] || statusConfig[WS_CONNECTION_STATUS.DISCONNECTED]
 
     return (
       <div className={`status-badge ${config.className}`}>
         <div className="status-dot"></div>
         <span>{config.label}</span>
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className="operator-app">
@@ -267,5 +267,5 @@ export default function OperatorPage() {
         )}
       </main>
     </div>
-  );
+  )
 }

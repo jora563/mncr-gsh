@@ -1,11 +1,25 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { keycloak } from '../services/keycloak.js'
+import { useToast } from '../providers/toast/useToast.js'
 import { ShieldCheckIcon, MessageSquareIcon } from '../components/icons.jsx'
 
 export default function HomePage() {
   const navigate = useNavigate()
+  const toast = useToast()
 
   const isAuthenticated = keycloak.isAuthenticated()
+
+  /**
+   * Показываем ошибку после возврата с logout при отказе в доступе
+   */
+  useEffect(() => {
+    const message = sessionStorage.getItem('forbidden_message')
+    if (message) {
+      sessionStorage.removeItem('forbidden_message')
+      toast.error(message)
+    }
+  }, [toast])
 
   const handleAdminClick = () => {
     if (isAuthenticated) {
@@ -29,7 +43,6 @@ export default function HomePage() {
         <div className="logo-mark">A</div>
         <div>
           <h1>AIOMNI</h1>
-          <p className="auth-subtitle">Платформа для управления чатами и ботами</p>
         </div>
         
         <div className="home-actions">
@@ -42,12 +55,6 @@ export default function HomePage() {
             <MessageSquareIcon width={18} height={18} />
             <span>Панель оператора</span>
           </button>
-
-          {!isAuthenticated && (
-            <p className="auth-hint">
-              Войдите в систему, чтобы получить доступ к панелям
-            </p>
-          )}
         </div>
       </div>
     </div>
