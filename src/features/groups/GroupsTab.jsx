@@ -1,30 +1,29 @@
-import { useState } from 'react';
-import DataTable from '../../components/table/DataTable.jsx';
-import ConfirmDialog from '../../components/modals/ConfirmDialog.jsx';
-import NameCell from '../../components/table/NameCell.jsx';
-import DateCell from '../../components/table/DateCell.jsx';
-import GroupFormModal from './GroupFormModal.jsx';
-import { useMutation } from '../../hooks/useMutation.js';
-import { dateTimeToTimestamp } from '../../utils/format.js';
-import * as api from '../../api/index.js';
-import { PencilIcon, TrashIcon, RefreshIcon, PlusIcon } from '../../components/icons.jsx';
+import { useState } from 'react'
+import DataTable from '../../components/table/DataTable.jsx'
+import ConfirmDialog from '../../components/modals/ConfirmDialog.jsx'
+import NameCell from '../../components/table/NameCell.jsx'
+import DateCell from '../../components/table/DateCell.jsx'
+import GroupFormModal from './GroupFormModal.jsx'
+import { useMutation } from '../../hooks/useMutation.js'
+import { dateTimeToTimestamp } from '../../utils/format.js'
+import * as api from '../../api/index.js'
+import { PencilIcon, TrashIcon, RefreshIcon, PlusIcon } from '../../components/icons.jsx'
 
 export default function GroupsTab({ groups, loading, refresh }) {
-  const [form, setForm] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [form, setForm] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const { run: removeGroup, busy: deleting } = useMutation({
     mutateFn: (groupId) => api.deleteProjectGroup(groupId),
     onSuccessMessage: 'Группа удалена.',
     onAfter: () => {
-      setDeleteTarget(null);
-      refresh();
+      setDeleteTarget(null)
+      refresh()
     },
-  });
+  })
 
   const columns = [
     { key: 'id', label: 'ID', sortable: true, render: (row) => <span className="mono">{row.id}</span> },
-    { key: 'external_id', label: 'External ID', sortable: true, render: (row) => <span className="chip">{row.external_id}</span> },
     { key: 'group_name', label: 'Название группы', sortable: true, render: (row) => <NameCell name={row.group_name} seed={row.id} /> },
     { key: 'created_on', label: 'Дата создания', sortable: true, sortValue: (row) => dateTimeToTimestamp(row.created_on), render: (row) => <DateCell value={row.created_on} /> },
     { key: 'altered_on', label: 'Дата изменения', sortable: true, sortValue: (row) => dateTimeToTimestamp(row.altered_on), render: (row) => <DateCell value={row.altered_on} /> },
@@ -43,7 +42,7 @@ export default function GroupsTab({ groups, loading, refresh }) {
         </div>
       ),
     },
-  ];
+  ]
 
   return (
     <section className="card">
@@ -66,7 +65,7 @@ export default function GroupsTab({ groups, loading, refresh }) {
         rows={groups}
         rowKey={(row) => row.id}
         loading={loading}
-        emptyText="Группы проектов не найдены"
+        emptyText="Группы проектов не найдены."
       />
 
       <div className="card-footer">
@@ -79,12 +78,12 @@ export default function GroupsTab({ groups, loading, refresh }) {
       {deleteTarget && (
         <ConfirmDialog
           title="Удалить группу?"
-          message={`Группа «${deleteTarget.group_name}» будет удалена. Если бэкенд выполняет каскадное удаление, все проекты этой группы также будут удалены.`}
+          message={`Группа «${deleteTarget.group_name}» будет удалена. Это действие нельзя будет отменить, но связанные проекты останутся в системе.`}
           busy={deleting}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => removeGroup(deleteTarget.id)}
         />
       )}
     </section>
-  );
+  )
 }
