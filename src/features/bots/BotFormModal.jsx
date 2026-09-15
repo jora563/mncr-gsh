@@ -13,6 +13,10 @@ function validate(values) {
   if (values.platform_id.trim() === '' || !Number.isInteger(platformId) || platformId <= 0) {
     errors.platform_id = 'Выберите платформу.';
   }
+  const projectId = Number(values.project_id);
+  if (values.project_id.trim() === '' || !Number.isInteger(projectId) || projectId <= 0) {
+    errors.project_id = 'Выберите проект.';
+  }
   if (!values.external_id.trim()) errors.external_id = 'Обязательное поле.';
   if (!values.token.trim()) errors.token = 'Укажите токен.';
   if (values.expiry_h.trim() !== '') {
@@ -39,13 +43,12 @@ export default function BotFormModal({ bot, projects, platforms, onClose, onSave
       const errs = validate(values);
       if (Object.keys(errs).length) { setErrors(errs); throw new Error('Проверьте поля формы.'); }
 
-      // ВАЖНО: project_id в теле НЕ отправляем — бэкенд с deny_unknown_fields отклонит запрос.
-      // Привязка к проекту определяется через platform/external_id на стороне бэкенда.
       const expiry = values.expiry_h.trim() === '' ? null : Number(values.expiry_h);
       const common = {
         platform_id: Number(values.platform_id),
+        project_id: Number(values.project_id),
         external_id: values.external_id.trim(),
-        token: values.token.trim(),
+        token: Array.from(new TextEncoder().encode(values.token.trim())),
       };
 
       const payload = isEdit
@@ -85,6 +88,12 @@ export default function BotFormModal({ bot, projects, platforms, onClose, onSave
             ))}
           </select>
         </Field>
+        <Field label="Проект" required error={errors.project_id}>
+          <select className="select" value={values.project_id} onChange={setField('project_id')} disabled={busy}>
+            <option value="">Выберите проект</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+          </select>
+        </Field>
         <div className="field-row">
           <Field label="External ID" required error={errors.external_id}>
             <input className="input" type="text" placeholder="bot_example" value={values.external_id} onChange={setField('external_id')} disabled={busy} />
@@ -95,12 +104,6 @@ export default function BotFormModal({ bot, projects, platforms, onClose, onSave
         </div>
         <Field label="Токен" required error={errors.token}>
           <input className="input" type="password" placeholder="Токен доступа бота" value={values.token} onChange={setField('token')} disabled={busy} />
-        </Field>
-        <Field label="Проект (только для справки)" hint="Привязка бота к проекту определяется на стороне бэкенда">
-          <select className="select" value={values.project_id} onChange={setField('project_id')} disabled>
-            <option value="">Выберите проект</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
-          </select>
         </Field>
       </form>
     </Modal>

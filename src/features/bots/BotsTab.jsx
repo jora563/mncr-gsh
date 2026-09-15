@@ -30,7 +30,6 @@ export default function BotsTab({ bots, projects, platforms, loading, refresh })
 
   const columns = [
     { key: 'id', label: 'ID бота', sortable: true, sortValue: (row) => row.account?.id, render: (row) => <span className="mono">{row.account?.id ?? '—'}</span> },
-    { key: 'platform_id', label: 'Platform ID', sortable: true, sortValue: (row) => row.account?.platform_id, render: (row) => <span className="mono">{row.account?.platform_id ?? '—'}</span> },
     { key: 'external_id', label: 'External ID', sortable: true, sortValue: (row) => row.account?.external_id ?? '', render: (row) => <span className="chip">{row.account?.external_id ?? '—'}</span> },
     { key: 'token', label: 'Токен', render: (row) => <TokenCell value={row.account?.token} /> },
     {

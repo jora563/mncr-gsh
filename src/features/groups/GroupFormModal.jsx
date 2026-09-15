@@ -25,9 +25,9 @@ export default function GroupFormModal({ group, onClose, onSaved }) {
       if (Object.keys(errs).length) { setErrors(errs); throw new Error('Проверьте поля.') }
 
       const payload = isEdit
-        ? { id: group.id, name: values.name.trim(),
+        ? { id: group.id, group_name: values.name.trim(),
             created_on: group.created_on ?? null, altered_on: group.altered_on ?? null }
-        : { name: values.name.trim() }
+        : { group_name: values.name.trim() }
 
       return isEdit ? api.updateProjectGroup(payload) : api.createProjectGroup(payload)
     },
