@@ -24,7 +24,9 @@ function ThemeToggle() {
   )
 }
 
-function Sidebar({ active, onSelect, stats, onLogout }) {
+function Sidebar({ active, onSelect, stats, onLogout, user }) {
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || ''
+
   return (
     <aside className="sidebar">
       <div className="logo">
@@ -60,8 +62,8 @@ function Sidebar({ active, onSelect, stats, onLogout }) {
             <KeyIcon width={15} height={15} />
           </div>
           <div className="session-info">
-            <b>Сессия активна</b>
-            <span>Keycloak</span>
+            <b>{fullName}</b>
+            <span>{user?.email || ''}</span>
           </div>
           <button type="button" className="session-logout" title="Выйти" onClick={onLogout}>
             <LogOutIcon width={15} height={15} />
@@ -86,6 +88,8 @@ function AdminPanel() {
     [groups, projects, bots]
   )
 
+  const user = useMemo(() => keycloak.getUser(), [])
+
   const section = SECTIONS.find((item) => item.id === active)
 
   const logout = () => {
@@ -94,7 +98,7 @@ function AdminPanel() {
 
   return (
     <div className="app">
-      <Sidebar active={active} onSelect={setActive} stats={stats} onLogout={logout} />
+      <Sidebar active={active} onSelect={setActive} stats={stats} onLogout={logout} user={user} />
       <div className="main">
         <header className="topbar">
           <div className="topbar-title">

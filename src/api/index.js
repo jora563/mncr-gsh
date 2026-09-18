@@ -45,3 +45,32 @@ export async function getAllBots(projects = null) {
     result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [],
   );
 }
+
+/* ---------- LLM API ---------- */
+
+export const getLlmProjects = () => http(API_ROUTES.llmProjects);
+export const getLlmProject = (projectId) => http(API_ROUTES.llmProject(projectId));
+export const createLlmProject = (data) => http(API_ROUTES.llmProjects, { method: 'POST', body: data });
+export const deleteLlmProject = (projectId) => http(API_ROUTES.llmProject(projectId), { method: 'DELETE' });
+
+export const uploadLlmKnowledge = (formData) => http(API_ROUTES.llmKnowledge, {
+  method: 'POST',
+  body: formData,
+});
+
+export const uploadLlmDataset = (formData) => http(API_ROUTES.llmDataset, {
+  method: 'POST',
+  body: formData,
+});
+
+export const uploadLlmQuestions = (formData) => http(API_ROUTES.llmQuestions, {
+  method: 'POST',
+  body: formData,
+});
+
+export const startLlmTraining = (data) => http(API_ROUTES.llmTrain, { method: 'POST', body: data });
+export const reloadLlmProject = (data) => http(API_ROUTES.llmReload, { method: 'POST', body: data });
+
+export const resumeLlmTraining = (jobUuid) => http(API_ROUTES.llmTrainingResume(jobUuid), { method: 'POST' });
+export const getLlmTrainingJob = (jobUuid) => http(API_ROUTES.llmTrainingJob(jobUuid));
+export const getLlmTrainingJobsByProject = (projectId) => http(API_ROUTES.llmTrainingJobsByProject(projectId));

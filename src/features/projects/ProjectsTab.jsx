@@ -6,17 +6,19 @@ import DateCell from '../../components/table/DateCell.jsx';
 import TokenCell from '../../components/table/TokenCell.jsx';
 import PlatformBadge from '../../components/table/PlatformBadge.jsx';
 import ProjectFormModal from './ProjectFormModal.jsx';
+import LlmProjectModal from './LlmProjectModal.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import { dateTimeToTimestamp } from '../../utils/format.js';
 import { describeError } from '../../utils/errors.js';
 import * as api from '../../api/index.js';
-import { PencilIcon, TrashIcon, RefreshIcon, PlusIcon, ChevronRightIcon } from '../../components/icons.jsx';
+import { PencilIcon, TrashIcon, RefreshIcon, PlusIcon, ChevronRightIcon, BrainIcon } from '../../components/icons.jsx';
 
 export default function ProjectsTab({ projects, groups, loading, refresh }) {
   const [groupFilter, setGroupFilter] = useState('all');
   const [form, setForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [expanded, setExpanded] = useState(null);
+  const [llmModal, setLlmModal] = useState(null);
 
   const { run: removeProject, busy: deleting } = useMutation({
     mutateFn: (projectId) => api.deleteProject(projectId),
@@ -117,6 +119,9 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
       align: 'right',
       render: (row) => (
         <div className="row-actions" onClick={(event) => event.stopPropagation()}>
+          <button type="button" className="icon-btn" title="LLM" onClick={() => setLlmModal(row)}>
+            <BrainIcon width={15} height={15} />
+          </button>
           <button type="button" className="icon-btn" title="Редактировать" onClick={() => setForm({ project: row })}>
             <PencilIcon width={15} height={15} />
           </button>
@@ -180,6 +185,13 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
             setExpanded(null);
             refresh();
           }}
+        />
+      )}
+
+      {llmModal && (
+        <LlmProjectModal
+          project={llmModal}
+          onClose={() => setLlmModal(null)}
         />
       )}
 

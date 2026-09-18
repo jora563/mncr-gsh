@@ -21,19 +21,25 @@ function extractMessage(payload, status) {
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
-export async function http(path, { method = 'GET', body } = {}) {
-  const headers = { Accept: 'application/json' };
-  // Если access_token протух — keycloak молча продлит его через refresh_token.
+export async function http(path, { method = 'GET', body, headers = {} } = {}) {
+  const defaultHeaders = { Accept: 'application/json' };
   const token = await keycloak.getValidToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (token) defaultHeaders.Authorization = `Bearer ${token}`;
+  
+  if (body !== undefined && !(body instanceof FormData)) {
+    defaultHeaders['Content-Type'] = 'application/json';
+  }
+
+  const finalHeaders = { ...defaultHeaders, ...headers };
 
   let response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      headers: finalHeaders,
+      body: body !== undefined 
+        ? (body instanceof FormData ? body : JSON.stringify(body))
+        : undefined,
     });
   } catch {
     throw new ApiError('Не удалось подключиться к серверу. Проверьте адрес API и сеть.', 0);

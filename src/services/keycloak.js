@@ -10,12 +10,32 @@ const logoutUrl = () => `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openi
 
 /**
  * Декодирование JWT токена, возвращает payload
+ * Использует TextDecoder для корректной работы с UTF-8 символами.
  */
 function decodeJWT(token) {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
-    return JSON.parse(atob(parts[1]))
+    
+    // Заменяем base64url символы на обычные base64
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    // Добавляем padding если нужно
+    const padLength = (4 - (base64.length % 4)) % 4
+    base64 += '='.repeat(padLength)
+    
+    // Декодируем base64 в бинарную строку
+    const binaryString = atob(base64)
+    
+    // Конвертируем бинарную строку в Uint8Array
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    
+    // Декодируем UTF-8 байты в строку
+    const payloadString = new TextDecoder('utf-8').decode(bytes)
+    
+    return JSON.parse(payloadString)
   } catch (error) {
     console.error('Ошибка декодирования JWT:', error)
     return null
@@ -205,6 +225,25 @@ export const keycloak = {
 
   isAuthenticated() {
     return Boolean(this.getToken())
+  },
+
+  /**
+   * Получение данных пользователя из id_token.
+   * Возвращает объект с firstName, lastName, email, username или null.
+   */
+  getUser() {
+    const idToken = sessionStorage.getItem('id_token')
+    if (!idToken) return null
+
+    const payload = decodeJWT(idToken)
+    if (!payload) return null
+
+    return {
+      firstName: payload.given_name || '',
+      lastName: payload.family_name || '',
+      email: payload.email || '',
+      username: payload.preferred_username || '',
+    }
   },
 
   /**

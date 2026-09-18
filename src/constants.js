@@ -50,6 +50,17 @@ export const API_ROUTES = {
   platforms: '/v1/admin_api/platforms',
   botsOfProject: (projectId) => `/v1/admin_api/project/${projectId}/bots`,
   bot: '/v1/admin_api/bot',
+  // LLM API
+  llmProjects: '/v1/admin_api/llm/projects',
+  llmProject: (projectId) => `/v1/admin_api/llm/project/${projectId}`,
+  llmKnowledge: '/v1/admin_api/llm/projects/knowledge',
+  llmDataset: '/v1/admin_api/llm/projects/dataset',
+  llmQuestions: '/v1/admin_api/llm/projects/questions',
+  llmTrain: '/v1/admin_api/llm/projects/train',
+  llmReload: '/v1/admin_api/llm/projects/reload',
+  llmTrainingResume: (jobUuid) => `/v1/admin_api/llm/training/resume/${jobUuid}`,
+  llmTrainingJob: (jobUuid) => `/v1/admin_api/llm/training/job/${jobUuid}`,
+  llmTrainingJobsByProject: (projectId) => `/v1/admin_api/llm/training/jobs_by_project/${projectId}`,
 };
 
 // ===== UI: градиенты аватаров =====
