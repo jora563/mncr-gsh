@@ -6,6 +6,7 @@ import { useMutation } from '../../hooks/useMutation.js';
 import { useApiQuery } from '../../hooks/useApiQuery.js';
 import * as api from '../../api/index.js';
 import { TrashIcon, PlusIcon } from '../../components/icons.jsx';
+import { formatDateParts } from '../../utils/format.js';
 
 function FileUploadField({ label, hint, accept, fileName, busy, onSelect }) {
   const inputRef = useRef(null);
@@ -52,19 +53,19 @@ export default function LlmProjectModal({ project, onClose }) {
   const { run: uploadKnowledge, busy: uploadingKnowledge } = useMutation({
     mutateFn: async (formData) => api.uploadLlmKnowledge(formData),
     onSuccessMessage: 'База знаний загружена.',
-    onAfter: () => {},
+    onAfter: () => refetchProject(),
   });
 
   const { run: uploadDataset, busy: uploadingDataset } = useMutation({
     mutateFn: async (formData) => api.uploadLlmDataset(formData),
     onSuccessMessage: 'Датасет загружен.',
-    onAfter: () => {},
+    onAfter: () => refetchProject(),
   });
 
   const { run: uploadQuestions, busy: uploadingQuestions } = useMutation({
     mutateFn: async (formData) => api.uploadLlmQuestions(formData),
     onSuccessMessage: 'Вопросы загружены.',
-    onAfter: () => {},
+    onAfter: () => refetchProject(),
   });
 
   const { run: startTraining, busy: training } = useMutation({
@@ -124,6 +125,25 @@ export default function LlmProjectModal({ project, onClose }) {
     setExpandedJob((current) => (current === jobId ? null : jobId));
   };
 
+  const formatLlmDate = (value) => {
+    const parts = formatDateParts(value);
+    return parts ? `${parts.date} ${parts.time}` : '—';
+  };
+
+  const isProjectCreated = Boolean(llmProject);
+  const dataTabsDisabled = !loading && !isProjectCreated;
+
+  const handleTabClick = (tabId) => {
+    if (dataTabsDisabled && (tabId === 'data' || tabId === 'training')) {
+      return;
+    }
+    setActiveTab(tabId);
+  };
+
+  const effectiveActiveTab = dataTabsDisabled && (activeTab === 'data' || activeTab === 'training')
+    ? 'info'
+    : activeTab;
+
   return (
     <>
       <Modal
@@ -134,20 +154,22 @@ export default function LlmProjectModal({ project, onClose }) {
       >
         <div className="tabs">
           <button
-            className={`tab ${activeTab === 'info' ? 'active' : ''}`}
-            onClick={() => setActiveTab('info')}
+            className={`tab ${effectiveActiveTab === 'info' ? 'active' : ''}`}
+            onClick={() => handleTabClick('info')}
           >
             Информация
           </button>
           <button
-            className={`tab ${activeTab === 'data' ? 'active' : ''}`}
-            onClick={() => setActiveTab('data')}
+            className={`tab ${effectiveActiveTab === 'data' ? 'active' : ''}`}
+            onClick={() => handleTabClick('data')}
+            disabled={dataTabsDisabled}
           >
             Загрузка данных
           </button>
           <button
-            className={`tab ${activeTab === 'training' ? 'active' : ''}`}
-            onClick={() => setActiveTab('training')}
+            className={`tab ${effectiveActiveTab === 'training' ? 'active' : ''}`}
+            onClick={() => handleTabClick('training')}
+            disabled={dataTabsDisabled}
           >
             Обучение
           </button>
@@ -157,18 +179,18 @@ export default function LlmProjectModal({ project, onClose }) {
 
         {!loading && (
           <>
-            {activeTab === 'info' && (
+            {effectiveActiveTab === 'info' && (
               <div className="tab-content">
                 {llmProject ? (
                   <div className="llm-info">
                     <p><strong>ID проекта:</strong> {llmProject.project_id}</p>
                     <p><strong>Название:</strong> {llmProject.name}</p>
-                    <p><strong>Создан:</strong> {llmProject.created_at}</p>
-                    <p><strong>Обновлён:</strong> {llmProject.updated_at}</p>
+                    <p><strong>Создан:</strong> {formatLlmDate(llmProject.created_at)}</p>
+                    <p><strong>Обновлён:</strong> {formatLlmDate(llmProject.updated_at)}</p>
                   </div>
                 ) : (
                   <div className="empty-state">
-                    Проект ещё не создан в LLM. Загрузите данные и запустите обучение.
+                    Проект ещё не создан в LLM.
                   </div>
                 )}
                 <div className="actions">
@@ -207,36 +229,36 @@ export default function LlmProjectModal({ project, onClose }) {
               </div>
             )}
 
-            {activeTab === 'data' && (
+            {effectiveActiveTab === 'data' && (
               <div className="tab-content">
-                <FileUploadField
-                  label="База знаний (CSV)"
-                  hint="Вопросы и ответы в формате CSV"
-                  accept=".csv"
-                  fileName={uploadedFiles.knowledge}
-                  busy={uploadingKnowledge}
-                  onSelect={(e) => handleFileUpload(e, 'knowledge', uploadKnowledge)}
-                />
-                <FileUploadField
-                  label="Датасет (JSONL)"
-                  hint="Данные в формате JSONL"
-                  accept=".jsonl,.json"
-                  fileName={uploadedFiles.dataset}
-                  busy={uploadingDataset}
-                  onSelect={(e) => handleFileUpload(e, 'dataset', uploadDataset)}
-                />
-                <FileUploadField
-                  label="Типичные вопросы (TXT)"
-                  hint="Каждый вопрос на новой строке"
-                  accept=".txt"
-                  fileName={uploadedFiles.questions}
-                  busy={uploadingQuestions}
-                  onSelect={(e) => handleFileUpload(e, 'questions', uploadQuestions)}
-                />
+              <FileUploadField
+              label="База знаний (CSV)"
+              hint="Вопросы и ответы в формате CSV"
+              accept=".csv"
+              fileName={uploadedFiles.knowledge}
+              busy={uploadingKnowledge || hasActiveJob}
+              onSelect={(e) => handleFileUpload(e, 'knowledge', uploadKnowledge)}
+              />
+              <FileUploadField
+              label="Датасет (JSONL)"
+              hint="Данные в формате JSONL"
+              accept=".jsonl,.json"
+              fileName={uploadedFiles.dataset}
+              busy={uploadingDataset || hasActiveJob}
+              onSelect={(e) => handleFileUpload(e, 'dataset', uploadDataset)}
+              />
+              <FileUploadField
+              label="Типичные вопросы (TXT)"
+              hint="Каждый вопрос на новой строке"
+              accept=".txt"
+              fileName={uploadedFiles.questions}
+              busy={uploadingQuestions || hasActiveJob}
+              onSelect={(e) => handleFileUpload(e, 'questions', uploadQuestions)}
+              />
               </div>
             )}
 
-            {activeTab === 'training' && (
+            {effectiveActiveTab === 'training' && (
               <div className="tab-content">
                 {Array.isArray(trainingJobs) && trainingJobs.length > 0 ? (
                   <div className="training-jobs">
@@ -295,7 +317,7 @@ export default function LlmProjectModal({ project, onClose }) {
                     type="button"
                     className="btn btn-primary"
                     onClick={startTraining}
-                    disabled={training || hasActiveJob}
+                    disabled={training || hasActiveJob || !llmProject?.dataset_path}
                   >
                     {training ? 'Запуск обучения...' : 'Начать обучение'}
                   </button>

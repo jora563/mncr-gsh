@@ -2,14 +2,12 @@ const dateOnlyFormat = new Intl.DateTimeFormat('ru-RU', {
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
-  timeZone: 'UTC',
 });
 
 const timeOnlyFormat = new Intl.DateTimeFormat('ru-RU', {
   hour: '2-digit',
   minute: '2-digit',
   second: '2-digit',
-  timeZone: 'UTC',
 });
 
 /**
@@ -27,6 +25,15 @@ export function dateTimeToTimestamp(value) {
       date.setUTCHours(hour, minute, second, 0);
       return date.getTime();
     }
+  }
+
+  if (typeof value === 'string') {
+    // Бэк отдаёт даты в UTC; если timezone в строке не указан, помечаем её как UTC.
+    let normalized = value.replace(' ', 'T');
+    if (!/[zZ+-]/.test(normalized.slice(-6))) {
+      normalized += 'Z';
+    }
+    return new Date(normalized).getTime();
   }
 
   return new Date(value).getTime();

@@ -35,7 +35,7 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
 
       const payload = isEdit
         ? { id: project.id, project_group_id: Number(values.group_id), external_id: values.external_id.trim(),
-            project_name: values.name.trim(), created_on: project.created_on ?? null, altered_on: project.altered_on ?? null,
+            project_name: values.name.trim(),
             system_prompt: systemPrompt, fallback_message: fallbackMessage }
         : { group_id: Number(values.group_id), external_id: values.external_id.trim(), name: values.name.trim(),
             system_prompt: systemPrompt, fallback_message: fallbackMessage };

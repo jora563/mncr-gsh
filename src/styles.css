@@ -976,6 +976,10 @@ tr.expanded-parent .expand-toggle { transform: rotate(90deg); color: var(--prima
   color: var(--muted);
   transition: background-color .15s ease, color .15s ease;
 }
+.tab[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .tab:hover { color: var(--text); }
 .tab.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
 
