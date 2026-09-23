@@ -53,20 +53,19 @@ export const getLlmProject = (projectId) => http(API_ROUTES.llmProject(projectId
 export const createLlmProject = (data) => http(API_ROUTES.llmProjects, { method: 'POST', body: data });
 export const deleteLlmProject = (projectId) => http(API_ROUTES.llmProject(projectId), { method: 'DELETE' });
 
-export const uploadLlmKnowledge = (formData) => http(API_ROUTES.llmKnowledge, {
-  method: 'POST',
-  body: formData,
-});
+/**
+ * Универсальная функция загрузки файлов в LLM API
+ */
+function uploadLlmFile(route, formData) {
+  return http(route, {
+    method: 'POST',
+    body: formData,
+  });
+}
 
-export const uploadLlmDataset = (formData) => http(API_ROUTES.llmDataset, {
-  method: 'POST',
-  body: formData,
-});
-
-export const uploadLlmQuestions = (formData) => http(API_ROUTES.llmQuestions, {
-  method: 'POST',
-  body: formData,
-});
+export const uploadLlmKnowledge = (formData) => uploadLlmFile(API_ROUTES.llmKnowledge, formData);
+export const uploadLlmDataset = (formData) => uploadLlmFile(API_ROUTES.llmDataset, formData);
+export const uploadLlmQuestions = (formData) => uploadLlmFile(API_ROUTES.llmQuestions, formData);
 
 export const startLlmTraining = (data) => http(API_ROUTES.llmTrain, { method: 'POST', body: data });
 export const reloadLlmProject = (data) => http(API_ROUTES.llmReload, { method: 'POST', body: data });

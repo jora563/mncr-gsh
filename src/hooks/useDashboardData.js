@@ -14,12 +14,12 @@ export function useDashboardData(enabled) {
 
   // Чистая загрузка без управления состоянием — общая логика, используется и ниже
   const fetchData = useCallback(async () => {
-    const groups = await api.getProjectGroups();
-    const projects = await api.getAllProjects();
+    const [groups, projects, platforms] = await Promise.all([
+      api.getProjectGroups(),
+      api.getAllProjects(),
+      api.getPlatforms().catch(() => []),
+    ]);
     const bots = await api.getAllBots(projects);
-    // Платформы — вспомогательный справочник для формы бота;
-    // их недоступность не должна ломать весь дашборд.
-    const platforms = await api.getPlatforms().catch(() => []);
     return { groups, projects, bots, platforms };
   }, []);
 

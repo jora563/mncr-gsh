@@ -1,34 +1,35 @@
+import { useMemo } from 'react';
 import { formatDateParts } from '../../utils/format.js';
 import { LoaderIcon } from '../icons.jsx';
 
+/**
+ * Дата сообщения: сервер шлёт date_time, локальные исходящие — dateTime
+ */
+const rawDate = (message) => message.date_time ?? message.dateTime;
+
+/**
+ * Форматирование времени сообщения
+ */
+const formatTime = (message) => {
+  const parts = formatDateParts(rawDate(message));
+  if (!parts) return '';
+  return parts.time;
+};
+
+/**
+ * Форматирование даты сообщения
+ */
+const formatDate = (message) => {
+  const parts = formatDateParts(rawDate(message));
+  if (!parts) return '';
+  return parts.date;
+};
+
 export default function ChatMessages({ messages, messagesEndRef, loading }) {
-  /**
-   * Дата сообщения: сервер шлёт date_time, локальные исходящие — dateTime
-   */
-  const rawDate = (message) => message.date_time ?? message.dateTime;
-
-  /**
-   * Форматирование времени сообщения
-   */
-  const formatTime = (message) => {
-    const parts = formatDateParts(rawDate(message));
-    if (!parts) return '';
-    return parts.time;
-  };
-
-  /**
-   * Форматирование даты сообщения
-   */
-  const formatDate = (message) => {
-    const parts = formatDateParts(rawDate(message));
-    if (!parts) return '';
-    return parts.date;
-  };
-
   /**
    * Группировка сообщений по дате
    */
-  const groupMessagesByDate = () => {
+  const messageGroups = useMemo(() => {
     const groups = [];
     let currentDate = null;
 
@@ -44,9 +45,7 @@ export default function ChatMessages({ messages, messagesEndRef, loading }) {
     });
 
     return groups;
-  };
-
-  const messageGroups = groupMessagesByDate();
+  }, [messages]);
 
   return (
     <div className="chat-messages">

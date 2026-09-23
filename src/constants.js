@@ -1,7 +1,12 @@
 // ===== Хранилище (ключи sessionStorage/localStorage) =====
 export const STORAGE_KEYS = {
-  TOKEN: 'aiomni.admin.token',
   THEME: 'aiomni.theme',
+  ACCESS_TOKEN: 'access_token',
+  REFRESH_TOKEN: 'refresh_token',
+  ID_TOKEN: 'id_token',
+  OAUTH_STATE: 'oauth_state',
+  LOGIN_REDIRECT_TO: 'login_redirect_to',
+  FORBIDDEN_MESSAGE: 'forbidden_message',
 };
 
 // ===== Темы =====
@@ -72,3 +77,14 @@ export const KNOWN_PLATFORMS = [
   { match: 'vk', className: 'badge--vk' },
   { match: 'max', className: 'badge--max' },
 ];
+
+// ===== Статусы оператора =====
+export const OPERATOR_STATUSES = {
+  ONLINE: 1,
+  OFFLINE: 0,
+};
+
+// ===== Статусы чатов =====
+export const CHAT_STATUSES = {
+  CLOSED: 2,
+};

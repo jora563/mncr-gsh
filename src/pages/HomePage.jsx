@@ -42,7 +42,7 @@ export default function HomePage() {
       <div className="auth-card home-card">
         <div className="logo-mark">A</div>
         <div>
-          <h1>AIOMNI</h1>
+          <h1>AI-Omni</h1>
         </div>
         
         <div className="home-actions">

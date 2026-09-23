@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { operatorWS, WS_EVENT_TYPES, WS_CONNECTION_STATUS } from '../services/websocket.js';
 import { useToast } from '../providers/toast/useToast.js';
+import { CHAT_STATUSES } from '../constants.js';
 
 /**
  * Входящее ли сообщение (от клиента).
@@ -48,12 +49,12 @@ export function useOperatorChat() {
   /**
    * Загрузка истории сообщений
    */
-  const loadHistory = useCallback(async (chatId, beforeMessageId = null, size = 50) => {
+  const loadHistory = useCallback(async (chatId, afterMessageId = 0, size = 50) => {
     if (!chatId) return;
 
     try {
       setLoading(true);
-      await operatorWS.getMessageHistory(chatId, beforeMessageId, size);
+      await operatorWS.getMessageHistory(chatId, afterMessageId, size);
     } catch {
       toast.error('Не удалось загрузить историю');
     } finally {
@@ -224,7 +225,7 @@ export function useOperatorChat() {
       return;
     }
 
-    const tempId = Date.now();
+    const tempId = crypto.randomUUID();
 
     try {
       setLoading(true);
@@ -305,7 +306,7 @@ export function useOperatorChat() {
 
     try {
       setLoading(true);
-      await operatorWS.changeChatStatus(chatId, 2); // 2 = closed
+      await operatorWS.changeChatStatus(chatId, CHAT_STATUSES.CLOSED);
       currentChatIdRef.current = null;
       setCurrentChatId(null);
       setMessages([]);

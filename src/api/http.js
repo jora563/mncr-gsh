@@ -57,7 +57,8 @@ export async function http(path, { method = 'GET', body, headers = {} } = {}) {
 
   if (!response.ok) {
     if (response.status === HTTP_STATUS.UNAUTHORIZED) {
-      keycloak.logout();
+      keycloak.clearSession();
+      window.location.href = '/';
     }
     throw new ApiError(extractMessage(payload, response.status), response.status, payload);
   }

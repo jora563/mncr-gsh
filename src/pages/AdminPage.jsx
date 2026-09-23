@@ -32,8 +32,8 @@ function Sidebar({ active, onSelect, stats, onLogout, user }) {
       <div className="logo">
         <div className="logo-mark">A</div>
         <div className="logo-text">
-          AIOMNI
-          <span>Admin Panel</span>
+          AI-Omni
+          <span>Админ-панель</span>
         </div>
       </div>
 

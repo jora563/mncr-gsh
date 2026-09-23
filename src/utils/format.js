@@ -10,6 +10,8 @@ const timeOnlyFormat = new Intl.DateTimeFormat('ru-RU', {
   second: '2-digit',
 });
 
+const textDecoder = new TextDecoder('utf-8', { fatal: false });
+
 /**
  * README описывает формат дат как [Year, Day, Hour, Minute, Second, NanoSecond],
  * где Day — день года (1-366). Наносекунды игнорируем.
@@ -53,7 +55,7 @@ export function normalizeToken(value) {
   if (value == null) return '';
   if (Array.isArray(value)) {
     try {
-      return new TextDecoder('utf-8', { fatal: false }).decode(Uint8Array.from(value));
+      return textDecoder.decode(Uint8Array.from(value));
     } catch {
       return value.join('');
     }
