@@ -28,22 +28,62 @@ export const getPlatforms = () => http(API_ROUTES.platforms);
 
 export const getBot = (botId) => http(`${API_ROUTES.bot}/${botId}`);
 export const getBotsOfProject = (projectId) => http(API_ROUTES.botsOfProject(projectId));
-export const createBotAccount = (data) => http(API_ROUTES.bot, { method: 'POST', body: data });
-export const updateBotAccount = (data) => http(API_ROUTES.bot, { method: 'PUT', body: data });
-export const deleteBotAccount = (botId) => http(`${API_ROUTES.bot}/${botId}`, { method: 'DELETE' });
+
+// Кэш ботов: сборка списка по всем проектам стоит N+1 запросов, поэтому
+// результат запоминается и сбрасывается только мутациями ботов.
+// Смена состава проектов сама меняет ключ кэша.
+let botsCache = null;
+
+function invalidateBotsCache() {
+  botsCache = null;
+}
+
+function botsCacheKey(projectList) {
+  return projectList
+    .map((project) => project.id)
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+export const createBotAccount = async (data) => {
+  const result = await http(API_ROUTES.bot, { method: 'POST', body: data });
+  invalidateBotsCache();
+  return result;
+};
+
+export const updateBotAccount = async (data) => {
+  const result = await http(API_ROUTES.bot, { method: 'PUT', body: data });
+  invalidateBotsCache();
+  return result;
+};
+
+export const deleteBotAccount = async (botId) => {
+  const result = await http(`${API_ROUTES.bot}/${botId}`, { method: 'DELETE' });
+  invalidateBotsCache();
+  return result;
+};
 
 /**
  * Единого списка ботов в API нет: собираем по всем проектам параллельно.
  * Promise.allSettled гарантирует, что падение одного проекта не сломает остальные.
+ * Результат кэшируется: повторный вызов с тем же составом проектов
+ * возвращает закэшированный список без сетевых запросов.
  */
 export async function getAllBots(projects = null) {
   const projectList = projects ?? (await getAllProjects());
   if (!projectList.length) return [];
 
+  const key = botsCacheKey(projectList);
+  if (botsCache && botsCache.key === key) {
+    return botsCache.value;
+  }
+
   const responses = await Promise.allSettled(projectList.map((p) => getBotsOfProject(p.id)));
-  return responses.flatMap((result) =>
+  const bots = responses.flatMap((result) =>
     result.status === 'fulfilled' && Array.isArray(result.value) ? result.value : [],
   );
+  botsCache = { key, value: bots };
+  return bots;
 }
 
 /* ---------- LLM API ---------- */

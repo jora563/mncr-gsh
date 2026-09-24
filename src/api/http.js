@@ -21,11 +21,28 @@ function extractMessage(payload, status) {
 
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 
-export async function http(path, { method = 'GET', body, headers = {} } = {}) {
+// ===== Кэш GET-запросов =====
+// Время жизни завершённого GET-запроса: в пределах этого окна повторный
+// запрос возвращает закэшированное значение без обращения к сети.
+const GET_CACHE_TTL_MS = 2000;
+// Летящие GET-запросы: одинаковые параллельные вызовы возвращают один Promise.
+const inflightGets = new Map();
+// Завершённые GET-ответы.
+const getCache = new Map();
+
+function requestKey(method, path) {
+  return `${method} ${path}`;
+}
+
+function clearGetCache() {
+  getCache.clear();
+}
+
+async function executeRequest(path, { method, body, headers }) {
   const defaultHeaders = { Accept: 'application/json' };
   const token = await keycloak.getValidToken();
   if (token) defaultHeaders.Authorization = `Bearer ${token}`;
-  
+
   if (body !== undefined && !(body instanceof FormData)) {
     defaultHeaders['Content-Type'] = 'application/json';
   }
@@ -37,7 +54,7 @@ export async function http(path, { method = 'GET', body, headers = {} } = {}) {
     response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers: finalHeaders,
-      body: body !== undefined 
+      body: body !== undefined
         ? (body instanceof FormData ? body : JSON.stringify(body))
         : undefined,
     });
@@ -64,4 +81,48 @@ export async function http(path, { method = 'GET', body, headers = {} } = {}) {
   }
 
   return payload;
+}
+
+export function http(path, { method = 'GET', body, headers = {} } = {}) {
+  const isGet = method === 'GET';
+  const key = requestKey(method, path);
+
+  if (isGet) {
+    const cached = getCache.get(key);
+    if (cached && Date.now() - cached.time < GET_CACHE_TTL_MS) {
+      return Promise.resolve(cached.value);
+    }
+    const inflight = inflightGets.get(key);
+    if (inflight) {
+      return inflight;
+    }
+  }
+
+  const request = executeRequest(path, { method, body, headers });
+
+  if (isGet) {
+    inflightGets.set(key, request);
+    request.then(
+      (value) => {
+        getCache.set(key, { time: Date.now(), value });
+      },
+      () => {
+        // ошибки не кэшируем
+      },
+    );
+    request.then(
+      () => inflightGets.delete(key),
+      () => inflightGets.delete(key),
+    );
+  } else {
+    // Любая мутация инвалидирует кэш GET: на старте и на завершении,
+    // чтобы в кэш не попали данные, снятые до применения мутации.
+    clearGetCache();
+    request.then(
+      () => clearGetCache(),
+      () => clearGetCache(),
+    );
+  }
+
+  return request;
 }

@@ -7,7 +7,7 @@ import GroupsTab from '../features/groups/GroupsTab.jsx'
 import ProjectsTab from '../features/projects/ProjectsTab.jsx'
 import BotsTab from '../features/bots/BotsTab.jsx'
 import { keycloak } from '../services/keycloak.js'
-import { LayersIcon, BriefcaseIcon, BotIcon, SunIcon, MoonIcon, LogOutIcon, KeyIcon } from '../components/icons.jsx'
+import { LayersIcon, BriefcaseIcon, BotIcon, SunIcon, MoonIcon, LogOutIcon } from '../components/icons.jsx'
 
 const SECTIONS = [
   { id: 'groups', label: 'Группы проектов', subtitle: 'Управление проектными группами', icon: LayersIcon },
@@ -58,9 +58,6 @@ function Sidebar({ active, onSelect, stats, onLogout, user }) {
       <div className="sidebar-footer">
         <ApiStatus />
         <div className="session-chip">
-          <div className="session-avatar">
-            <KeyIcon width={15} height={15} />
-          </div>
           <div className="session-info">
             <b>{fullName}</b>
             <span>{user?.email || ''}</span>
@@ -113,7 +110,7 @@ function AdminPanel() {
         <div className="content">
           <StatsRow stats={stats} loading={loading} />
           {active === 'groups' && <GroupsTab groups={groups} loading={loading} refresh={refresh} />}
-          {active === 'projects' && <ProjectsTab projects={projects} groups={groups} loading={loading} refresh={refresh} />}
+          {active === 'projects' && <ProjectsTab projects={projects} groups={groups} bots={bots} loading={loading} refresh={refresh} />}
           {active === 'bots' && <BotsTab bots={bots} projects={projects} platforms={platforms} loading={loading} refresh={refresh} />}
         </div>
       </div>

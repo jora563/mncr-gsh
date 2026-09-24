@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Modal from '../../components/modals/Modal.jsx';
 import Field from '../../components/forms/Field.jsx';
+import CustomSelect from '../../components/forms/CustomSelect.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import { normalizeToken } from '../../utils/format.js';
 import * as api from '../../api/index.js';
@@ -66,6 +67,27 @@ export default function BotFormModal({ bot, projects, platforms, onClose, onSave
     setErrors((err) => ({ ...err, [name]: undefined }));
   };
 
+  const setCustomField = (name) => (value) => {
+    setValues((v) => ({ ...v, [name]: value }));
+    setErrors((err) => ({ ...err, [name]: undefined }));
+  };
+
+  const platformOptions = useMemo(
+    () => [
+      { value: '', label: 'Выберите платформу' },
+      ...platforms.map((p) => ({ value: String(p.platform.id), label: p.platform.name })),
+    ],
+    [platforms],
+  );
+
+  const projectOptions = useMemo(
+    () => [
+      { value: '', label: 'Выберите проект' },
+      ...projects.map((p) => ({ value: String(p.id), label: p.project_name })),
+    ],
+    [projects],
+  );
+
   return (
     <Modal
       title={isEdit ? 'Редактировать бота' : 'Добавить бота'}
@@ -81,22 +103,26 @@ export default function BotFormModal({ bot, projects, platforms, onClose, onSave
     >
       <form id={FORM_ID} className="form" onSubmit={(e) => { e.preventDefault(); save(); }} noValidate>
         <Field label="Платформа" required error={errors.platform_id}>
-          <select className="select" value={values.platform_id} onChange={setField('platform_id')} disabled={busy}>
-            <option value="">Выберите платформу</option>
-            {platforms.map((p) => (
-              <option key={p.platform.id} value={p.platform.id}>{p.platform.name}</option>
-            ))}
-          </select>
+          <CustomSelect
+            value={values.platform_id}
+            onChange={setCustomField('platform_id')}
+            options={platformOptions}
+            placeholder="Выберите платформу"
+            disabled={busy}
+          />
         </Field>
         <Field label="Проект" required error={errors.project_id}>
-          <select className="select" value={values.project_id} onChange={setField('project_id')} disabled={busy}>
-            <option value="">Выберите проект</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
-          </select>
+          <CustomSelect
+            value={values.project_id}
+            onChange={setCustomField('project_id')}
+            options={projectOptions}
+            placeholder="Выберите проект"
+            disabled={busy}
+          />
         </Field>
         <div className="field-row">
-          <Field label="External ID" required error={errors.external_id}>
-            <input className="input" type="text" placeholder="bot_example" value={values.external_id} onChange={setField('external_id')} disabled={busy} />
+          <Field label="Внешний ID" required error={errors.external_id}>
+            <input className="input" type="text" placeholder="1234567890" value={values.external_id} onChange={setField('external_id')} disabled={busy} />
           </Field>
           <Field label="Срок действия (часы)" error={errors.expiry_h} hint="Необязательное поле">
             <input className="input" type="number" min="0" step="1" placeholder="720" value={values.expiry_h} onChange={setField('expiry_h')} disabled={busy} />

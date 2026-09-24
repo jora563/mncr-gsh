@@ -182,18 +182,32 @@ export default function LlmProjectModal({ project, onClose }) {
             {effectiveActiveTab === 'info' && (
               <div className="tab-content">
                 {llmProject ? (
-                  <div className="llm-info">
-                    <p><strong>ID проекта:</strong> {llmProject.project_id}</p>
-                    <p><strong>Название:</strong> {llmProject.name}</p>
-                    <p><strong>Создан:</strong> {formatLlmDate(llmProject.created_at)}</p>
-                    <p><strong>Обновлён:</strong> {formatLlmDate(llmProject.updated_at)}</p>
-                  </div>
+                  <table className="mini-table">
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '140px', fontWeight: 600 }}>ID проекта</td>
+                        <td className="mono">{llmProject.project_id}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}>Название</td>
+                        <td>{llmProject.name}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}>Создан</td>
+                        <td>{formatLlmDate(llmProject.created_at)}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 600 }}>Обновлён</td>
+                        <td>{formatLlmDate(llmProject.updated_at)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 ) : (
                   <div className="empty-state">
                     Проект ещё не создан в LLM.
                   </div>
                 )}
-                <div className="actions">
+                <div className="actions" style={{ justifyContent: 'space-between' }}>
                   {llmProject ? (
                     <>
                       <button
@@ -317,7 +331,7 @@ export default function LlmProjectModal({ project, onClose }) {
                     type="button"
                     className="btn btn-primary"
                     onClick={startTraining}
-                    disabled={training || hasActiveJob || !llmProject?.dataset_path}
+                    disabled={training || hasActiveJob || uploadingDataset || (!llmProject?.dataset_path && !uploadedFiles.dataset)}
                   >
                     {training ? 'Запуск обучения...' : 'Начать обучение'}
                   </button>

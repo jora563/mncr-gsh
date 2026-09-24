@@ -5,15 +5,15 @@ import NameCell from '../../components/table/NameCell.jsx';
 import DateCell from '../../components/table/DateCell.jsx';
 import TokenCell from '../../components/table/TokenCell.jsx';
 import PlatformBadge from '../../components/table/PlatformBadge.jsx';
+import CustomSelect from '../../components/forms/CustomSelect.jsx';
 import ProjectFormModal from './ProjectFormModal.jsx';
 import LlmProjectModal from './LlmProjectModal.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import { dateTimeToTimestamp } from '../../utils/format.js';
-import { describeError } from '../../utils/errors.js';
 import * as api from '../../api/index.js';
 import { PencilIcon, TrashIcon, RefreshIcon, PlusIcon, ChevronRightIcon, BrainIcon } from '../../components/icons.jsx';
 
-export default function ProjectsTab({ projects, groups, loading, refresh }) {
+export default function ProjectsTab({ projects, groups, bots, loading, refresh }) {
   const [groupFilter, setGroupFilter] = useState('all');
   const [form, setForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -38,49 +38,38 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
     return projects.filter((project) => project.project_group_id === groupId);
   }, [projects, groupFilter]);
 
-  const toggleProjectBots = async (project) => {
-    if (expanded?.projectId === project.id) {
+  const expandedBots = useMemo(
+    () => bots.filter((bot) => bot.project?.id === expanded),
+    [bots, expanded],
+  );
+
+  const toggleProjectBots = (project) => {
+    if (expanded === project.id) {
       setExpanded(null);
       return;
     }
-    setExpanded({ projectId: project.id, loading: true });
-    try {
-      const bots = await api.getBotsOfProject(project.id);
-      setExpanded((current) =>
-        current?.projectId === project.id
-          ? { projectId: project.id, loading: false, bots: Array.isArray(bots) ? bots : [] }
-          : current,
-      );
-    } catch (error) {
-      setExpanded((current) =>
-        current?.projectId === project.id
-          ? { projectId: project.id, loading: false, error: describeError(error) }
-          : current,
-      );
-    }
+    setExpanded(project.id);
   };
 
   const renderExpanded = (project) => {
-    if (expanded?.projectId !== project.id) return null;
-    if (expanded.loading) return <div className="expansion-note">Загружаем ботов проекта…</div>;
-    if (expanded.error) return <div className="expansion-note expansion-note--error">{expanded.error}</div>;
-    if (!expanded.bots.length) return <div className="expansion-note">У проекта пока нет ботов.</div>;
+    if (expanded !== project.id) return null;
+    if (!expandedBots.length) return <div className="expansion-note">У проекта пока нет ботов.</div>;
     return (
       <div>
-        <h4>Боты проекта «{project.project_name}» — {expanded.bots.length}</h4>
+        <h4>Боты проекта «{project.project_name}» — {expandedBots.length}</h4>
         <div className="mini-table">
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>External ID</th>
+                <th>Внешний ID</th>
                 <th>Платформа</th>
                 <th>Токен</th>
                 <th>Срок (ч)</th>
               </tr>
             </thead>
             <tbody>
-              {expanded.bots.map((bot) => (
+              {expandedBots.map((bot) => (
                 <tr key={bot.account?.id ?? `${bot.account?.platform_id}-${bot.account?.external_id}`}>
                   <td className="mono">{bot.account?.id ?? '—'}</td>
                   <td><span className="chip">{bot.account?.external_id ?? '—'}</span></td>
@@ -96,10 +85,18 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
     );
   };
 
+  const groupOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Все группы' },
+      ...groups.map((group) => ({ value: String(group.id), label: group.group_name })),
+    ],
+    [groups],
+  );
+
   const columns = [
     { key: 'expand', label: '', width: 28, render: () => <ChevronRightIcon className="expand-toggle" width={15} height={15} /> },
     { key: 'id', label: 'ID', sortable: true, render: (row) => <span className="mono">{row.id}</span> },
-    { key: 'external_id', label: 'External ID', sortable: true, render: (row) => <span className="chip">{row.external_id}</span> },
+    { key: 'external_id', label: 'Внешний ID', sortable: true, render: (row) => <span className="chip">{row.external_id}</span> },
     { key: 'project_name', label: 'Название проекта', sortable: true, render: (row) => <NameCell name={row.project_name} seed={row.id} /> },
     {
       key: 'group',
@@ -139,17 +136,13 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
         <h2>Список проектов</h2>
         <span className="count-pill">{visibleProjects.length}</span>
         <div className="toolbar-spacer" />
-        <select
-          className="select"
-          aria-label="Фильтр по группе"
+        <CustomSelect
+          className="custom-select--toolbar"
           value={groupFilter}
-          onChange={(event) => setGroupFilter(event.target.value)}
-        >
-          <option value="all">Все группы</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.id}>{group.group_name}</option>
-          ))}
-        </select>
+          onChange={setGroupFilter}
+          options={groupOptions}
+          ariaLabel="Фильтр по группе"
+        />
         <button type="button" className="btn" onClick={refresh} disabled={loading}>
           <RefreshIcon width={14} height={14} />
           Обновить
@@ -167,7 +160,7 @@ export default function ProjectsTab({ projects, groups, loading, refresh }) {
         loading={loading}
         emptyText="Проекты не найдены"
         onRowClick={toggleProjectBots}
-        expandedKey={expanded?.projectId}
+        expandedKey={expanded}
         renderExpanded={renderExpanded}
       />
 

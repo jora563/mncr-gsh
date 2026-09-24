@@ -3,6 +3,7 @@ import DataTable from '../../components/table/DataTable.jsx';
 import ConfirmDialog from '../../components/modals/ConfirmDialog.jsx';
 import TokenCell from '../../components/table/TokenCell.jsx';
 import PlatformBadge from '../../components/table/PlatformBadge.jsx';
+import CustomSelect from '../../components/forms/CustomSelect.jsx';
 import BotFormModal from './BotFormModal.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import * as api from '../../api/index.js';
@@ -28,9 +29,18 @@ export default function BotsTab({ bots, projects, platforms, loading, refresh })
     return bots.filter((bot) => bot.project?.id === projectId);
   }, [bots, projectFilter]);
 
+  const projectOptions = useMemo(() => {
+    const projectIdsWithBots = new Set(bots.map((bot) => bot.project?.id).filter(Boolean));
+    const projectsWithBots = projects.filter((project) => projectIdsWithBots.has(project.id));
+    return [
+      { value: 'all', label: 'Все проекты' },
+      ...projectsWithBots.map((project) => ({ value: String(project.id), label: project.project_name })),
+    ];
+  }, [projects, bots]);
+
   const columns = [
     { key: 'id', label: 'ID бота', sortable: true, sortValue: (row) => row.account?.id, render: (row) => <span className="mono">{row.account?.id ?? '—'}</span> },
-    { key: 'external_id', label: 'External ID', sortable: true, sortValue: (row) => row.account?.external_id ?? '', render: (row) => <span className="chip">{row.account?.external_id ?? '—'}</span> },
+    { key: 'external_id', label: 'Внешний ID', sortable: true, sortValue: (row) => row.account?.external_id ?? '', render: (row) => <span className="chip">{row.account?.external_id ?? '—'}</span> },
     { key: 'token', label: 'Токен', render: (row) => <TokenCell value={row.account?.token} /> },
     {
       key: 'expiry',
@@ -76,17 +86,13 @@ export default function BotsTab({ bots, projects, platforms, loading, refresh })
         <h2>Список ботов</h2>
         <span className="count-pill">{visibleBots.length}</span>
         <div className="toolbar-spacer" />
-        <select
-          className="select"
-          aria-label="Фильтр по проекту"
+        <CustomSelect
+          className="custom-select--toolbar"
           value={projectFilter}
-          onChange={(event) => setProjectFilter(event.target.value)}
-        >
-          <option value="all">Все проекты</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>{project.project_name}</option>
-          ))}
-        </select>
+          onChange={setProjectFilter}
+          options={projectOptions}
+          ariaLabel="Фильтр по проекту"
+        />
         <button type="button" className="btn" onClick={refresh} disabled={loading}>
           <RefreshIcon width={14} height={14} />
           Обновить

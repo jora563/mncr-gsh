@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Modal from '../../components/modals/Modal.jsx';
 import Field from '../../components/forms/Field.jsx';
+import CustomSelect from '../../components/forms/CustomSelect.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import * as api from '../../api/index.js';
 
@@ -51,6 +52,19 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
     setErrors((err) => ({ ...err, [name]: undefined }));
   };
 
+  const setCustomField = (name) => (value) => {
+    setValues((v) => ({ ...v, [name]: value }));
+    setErrors((err) => ({ ...err, [name]: undefined }));
+  };
+
+  const groupOptions = useMemo(
+    () => [
+      { value: '', label: 'Выберите группу' },
+      ...groups.map((g) => ({ value: String(g.id), label: g.group_name })),
+    ],
+    [groups],
+  );
+
   return (
     <Modal
       title={isEdit ? 'Редактировать проект' : 'Добавить проект'}
@@ -64,17 +78,20 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
       }
     >
       <form id={FORM_ID} className="form" onSubmit={(e) => { e.preventDefault(); save(); }} noValidate>
-        <Field label="External ID" required error={errors.external_id}>
-          <input className="input" type="text" placeholder="proj-example" value={values.external_id} onChange={setField('external_id')} disabled={busy} />
+        <Field label="Внешний ID" required error={errors.external_id}>
+          <input className="input" type="text" placeholder="7777" value={values.external_id} onChange={setField('external_id')} disabled={busy} />
         </Field>
         <Field label="Название проекта" required error={errors.name}>
-          <input className="input" type="text" placeholder="Например, Омега" value={values.name} onChange={setField('name')} disabled={busy} />
+          <input className="input" type="text" placeholder="Альфа" value={values.name} onChange={setField('name')} disabled={busy} />
         </Field>
         <Field label="Группа" required error={errors.group_id}>
-          <select className="select" value={values.group_id} onChange={setField('group_id')} disabled={busy}>
-            <option value="">Выберите группу</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.group_name}</option>)}
-          </select>
+          <CustomSelect
+            value={values.group_id}
+            onChange={setCustomField('group_id')}
+            options={groupOptions}
+            placeholder="Выберите группу"
+            disabled={busy}
+          />
         </Field>
         <Field label="Системный промпт" hint="Системный промпт, задающий роль и стиль поведения модели">
           <textarea className="input" rows={3} value={values.system_prompt} onChange={setField('system_prompt')} disabled={busy} />

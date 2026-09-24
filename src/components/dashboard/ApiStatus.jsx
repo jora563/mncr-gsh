@@ -10,24 +10,49 @@ const LABELS = {
 
 const CHECK_INTERVAL_MS = 30000;
 
+// Результат и время последней проверки на уровне модуля: при ремоунте
+// компонента не стреляем немедленным запросом, а показываем последний
+// известный статус и дожидаемся остатка интервала.
+let lastStatus = null;
+let lastCheckAt = 0;
+
 export default function ApiStatus() {
-  const [status, setStatus] = useState(API_STATUS.CHECKING);
+  const [status, setStatus] = useState(lastStatus ?? API_STATUS.CHECKING);
 
   useEffect(() => {
     let cancelled = false;
+    let timer = null;
+
     async function check() {
+      lastCheckAt = Date.now();
       try {
         await health();
-        if (!cancelled) setStatus(API_STATUS.OK);
+        lastStatus = API_STATUS.OK;
       } catch {
-        if (!cancelled) setStatus(API_STATUS.DOWN);
+        lastStatus = API_STATUS.DOWN;
       }
+      if (!cancelled) setStatus(lastStatus);
+      scheduleNext();
     }
-    check();
-    const timer = window.setInterval(check, CHECK_INTERVAL_MS);
+
+    function scheduleNext() {
+      const delay = Math.max(0, lastCheckAt + CHECK_INTERVAL_MS - Date.now());
+      timer = window.setTimeout(() => {
+        if (!cancelled) check();
+      }, delay);
+    }
+
+    if (lastStatus === null) {
+      // Первая проверка за сессию — выполняем сразу
+      check();
+    } else {
+      // Уже проверяли недавно: ждём остаток интервала
+      scheduleNext();
+    }
+
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
   }, []);
 
