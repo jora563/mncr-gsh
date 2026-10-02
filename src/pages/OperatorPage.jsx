@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useOperatorChat } from '../hooks/useOperatorChat.js';
 import { keycloak } from '../services/keycloak.js';
 import { WS_CONNECTION_STATUS } from '../services/websocket.js';
@@ -32,6 +32,9 @@ export default function OperatorPage() {
     closeChat,
     changeStatus,
   } = useOperatorChat();
+
+  const user = useMemo(() => keycloak.getUser(), []);
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
 
   /**
    * Автоматическое подключение при загрузке
@@ -75,19 +78,19 @@ export default function OperatorPage() {
   const renderConnectionStatus = () => {
     const statusConfig = {
       [WS_CONNECTION_STATUS.CONNECTED]: {
-        label: 'Подключено',
+        label: 'Чаты доступны',
         className: 'status-badge--success',
       },
       [WS_CONNECTION_STATUS.CONNECTING]: {
-        label: 'Подключение...',
+        label: 'Подключение к чатам',
         className: 'status-badge--warning',
       },
       [WS_CONNECTION_STATUS.DISCONNECTED]: {
-        label: 'Отключено',
+        label: 'Чаты недоступны',
         className: 'status-badge--error',
       },
       [WS_CONNECTION_STATUS.ERROR]: {
-        label: 'Ошибка',
+        label: 'Чаты недоступны',
         className: 'status-badge--error',
       },
     };
@@ -110,7 +113,7 @@ export default function OperatorPage() {
           <div className="logo-mark">A</div>
           <div className="logo-text">
             AI-Omni
-            <span>Operator Panel</span>
+            <span>Панель оператора</span>
           </div>
         </div>
 
@@ -198,11 +201,15 @@ export default function OperatorPage() {
           <div className="connection-status">
             {renderConnectionStatus()}
           </div>
-
-          <button type="button" className="btn btn-ghost" onClick={handleLogout}>
-            <LogOutIcon width={16} height={16} />
-            <span>Выйти</span>
-          </button>
+          <div className="session-chip">
+            <div className="session-info">
+              <b>{fullName}</b>
+              <span>{user?.email || ''}</span>
+            </div>
+            <button type="button" className="session-logout" title="Выйти" onClick={handleLogout}>
+              <LogOutIcon width={15} height={15} />
+            </button>
+          </div>
         </div>
       </aside>
 

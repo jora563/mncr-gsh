@@ -34,6 +34,16 @@ export default defineConfig(({ mode }) => {
                 proxyReq.setHeader('Authorization', `Bearer ${token}`);
               }
             });
+
+            // Подавляем ошибки EPIPE при обрыве соединения
+            proxy.on('error', (err) => {
+              if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+                // Соединение было закрыто клиентом - это нормально
+                return;
+              }
+              // Логируем только другие ошибки
+              console.error('Proxy error:', err.message);
+            });
           },
         },
         '/health': { target, changeOrigin: true },
