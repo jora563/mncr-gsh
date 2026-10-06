@@ -30,18 +30,18 @@ export default function LlmProjectModal({ project, onClose }) {
   const [deleteLlmTarget, setDeleteLlmTarget] = useState(null);
 
   const fetchProject = useCallback(
-    () => api.getLlmProject(project.id).catch(() => null),
-    [project.id]
+    () => api.getLlmProject(project.code).catch(() => null),
+    [project.code]
   );
 
   const fetchJobs = useCallback(async () => {
-    const jobs = await api.getLlmTrainingJobsByProject(project.id).catch(() => []);
+    const jobs = await api.getLlmTrainingJobsByProject(project.code).catch(() => []);
     const list = Array.isArray(jobs) ? jobs : [];
     const details = await Promise.allSettled(list.map((job) => api.getLlmTrainingJob(job.job_id)));
     return list.map((job, index) =>
       details[index].status === 'fulfilled' ? { ...job, ...details[index].value } : job,
     );
-  }, [project.id]);
+  }, [project.code]);
 
   const { data: llmProject, loading: loadingProject, refetch: refetchProject } = useApiQuery(fetchProject);
   const { data: trainingJobs, loading: loadingJobs, refetch: refetchJobs } = useApiQuery(fetchJobs);
@@ -69,7 +69,7 @@ export default function LlmProjectModal({ project, onClose }) {
   });
 
   const { run: startTraining, busy: training } = useMutation({
-    mutateFn: async () => api.startLlmTraining({ project_id: project.id }),
+    mutateFn: async () => api.startLlmTraining({ project_id: project.code }),
     onSuccessMessage: 'Обучение запущено.',
     onAfter: () => {
       refetchProject();
@@ -78,7 +78,7 @@ export default function LlmProjectModal({ project, onClose }) {
   });
 
   const { run: reloadProject, busy: reloading } = useMutation({
-    mutateFn: async () => api.reloadLlmProject({ project_id: project.id }),
+    mutateFn: async () => api.reloadLlmProject({ project_id: project.code }),
     onSuccessMessage: 'Проект перезапущен.',
     onAfter: () => {
       refetchProject();
@@ -93,7 +93,7 @@ export default function LlmProjectModal({ project, onClose }) {
   });
 
   const { run: createProjectInLlm, busy: creating } = useMutation({
-    mutateFn: async () => api.createLlmProject({ project_id: project.id, name: project.project_name }),
+    mutateFn: async () => api.createLlmProject({ project_id: project.code, name: project.project_name }),
     onSuccessMessage: 'Проект создан в LLM.',
     onAfter: () => {
       refetchProject();
@@ -102,7 +102,7 @@ export default function LlmProjectModal({ project, onClose }) {
   });
 
   const { run: deleteProjectFromLlm, busy: deletingLlm } = useMutation({
-    mutateFn: async () => api.deleteLlmProject(project.id),
+    mutateFn: async () => api.deleteLlmProject(project.code),
     onSuccessMessage: 'Проект удалён из LLM.',
     onAfter: () => {
       setDeleteLlmTarget(null);
@@ -116,7 +116,7 @@ export default function LlmProjectModal({ project, onClose }) {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('project_id', project.id);
+    formData.append('project_id', project.code);
     setUploadedFiles((current) => ({ ...current, [key]: file.name }));
     uploadFn(formData);
   };

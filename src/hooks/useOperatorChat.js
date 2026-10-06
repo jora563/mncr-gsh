@@ -31,6 +31,15 @@ export function useOperatorChat() {
   const currentChatIdRef = useRef(null);
 
   /**
+   * Автоочистка ошибки через 10 секунд
+   */
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 10000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  /**
    * Прокрутка к последнему сообщению
    */
   const scrollToBottom = useCallback(() => {

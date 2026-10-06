@@ -96,7 +96,7 @@ export default function ProjectsTab({ projects, groups, bots, loading, refresh }
   const columns = [
     { key: 'expand', label: '', width: 28, render: () => <ChevronRightIcon className="expand-toggle" width={15} height={15} /> },
     { key: 'id', label: 'ID', sortable: true, render: (row) => <span className="mono">{row.id}</span> },
-    { key: 'external_id', label: 'Внешний ID', sortable: true, render: (row) => <span className="chip">{row.external_id}</span> },
+    { key: 'code', label: 'Код проекта', sortable: true, render: (row) => <span className="chip">{row.code}</span> },
     { key: 'project_name', label: 'Название проекта', sortable: true, render: (row) => <NameCell name={row.project_name} seed={row.id} /> },
     {
       key: 'group',

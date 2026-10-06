@@ -380,6 +380,7 @@ textarea.input {
   resize: vertical;
   min-height: calc(1.5em * 3 + 18px);
 }
+.input:disabled { opacity: .55; cursor: not-allowed; }
 .field .select { width: 100%; }
 .field--invalid .input,
 .field--invalid .select { border-color: var(--danger); }
