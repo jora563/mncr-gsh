@@ -123,7 +123,7 @@ export function useOperatorChat() {
     chatWsMap.current[chatId] = ws;
     setActiveChats((prev) => (prev.includes(chatId) ? prev : [...prev, chatId]));
     setChats((prev) => ({ ...prev, [chatId]: { messages: [] } }));
-    setCurrentChatId((prev) => prev || chatId);
+    setCurrentChatId(chatId);
     toast.success(`Назначена заявка №${chatId}`);
     ws.getMessageHistory(chatId, 0, 50).catch(() => toast.error('Не удалось загрузить историю'));
   }, [toast]);
