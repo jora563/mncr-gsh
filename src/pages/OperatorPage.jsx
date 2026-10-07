@@ -18,6 +18,7 @@ export default function OperatorPage() {
   const {
     connectionStatus,
     currentChatId,
+    activeChats,
     messages,
     operatorStatus,
     loading,
@@ -31,6 +32,7 @@ export default function OperatorPage() {
     loadHistory,
     closeChat,
     changeStatus,
+    setCurrentChatId,
   } = useOperatorChat();
 
   const user = useMemo(() => keycloak.getUser(), []);
@@ -41,7 +43,6 @@ export default function OperatorPage() {
    */
   useEffect(() => {
     connect();
-
     return () => {
       disconnect();
     };
@@ -66,9 +67,10 @@ export default function OperatorPage() {
    * Переключение статуса оператора
    */
   const handleToggleStatus = () => {
-    const newStatus = operatorStatus === OPERATOR_STATUSES.ONLINE
-      ? OPERATOR_STATUSES.OFFLINE
-      : OPERATOR_STATUSES.ONLINE;
+    const newStatus =
+      operatorStatus === OPERATOR_STATUSES.ONLINE
+        ? OPERATOR_STATUSES.OFFLINE
+        : OPERATOR_STATUSES.ONLINE;
     changeStatus(newStatus);
   };
 
@@ -86,7 +88,7 @@ export default function OperatorPage() {
         className: 'status-badge--warning',
       },
       [WS_CONNECTION_STATUS.DISCONNECTED]: {
-        label: 'Чаты недоступны',
+        label: 'Отключен от чатов',
         className: 'status-badge--error',
       },
       [WS_CONNECTION_STATUS.ERROR]: {
@@ -120,7 +122,6 @@ export default function OperatorPage() {
         <div className="operator-controls">
           <div className="control-section">
             <h3>Управление</h3>
-
             <div className="control-group">
               <label className="control-label">Статус оператора</label>
               <button
@@ -144,46 +145,46 @@ export default function OperatorPage() {
             </div>
 
             <div className="control-group">
-              <label className="control-label">Очередь чатов</label>
+              <label className="control-label">Очередь заявок</label>
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={() => getNextChat()}
-                disabled={loading || connectionStatus !== WS_CONNECTION_STATUS.CONNECTED || currentChatId !== null}
+                disabled={loading || connectionStatus !== WS_CONNECTION_STATUS.CONNECTED}
               >
                 <MessageSquareIcon width={16} height={16} />
-                <span>Получить чат</span>
+                <span>Получить заявку</span>
               </button>
             </div>
 
-            {!currentChatId && (
-              <div className="control-group">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={restoreChat}
-                  disabled={loading || connectionStatus !== WS_CONNECTION_STATUS.CONNECTED}
-                >
-                  <ClockIcon width={16} height={16} />
-                  <span>Восстановить чат</span>
-                </button>
-              </div>
-            )}
+            <div className="control-group">
+              <button
+                type="button"
+                className="btn"
+                onClick={restoreChat}
+                disabled={loading || connectionStatus !== WS_CONNECTION_STATUS.CONNECTED || activeChats.length > 0}
+              >
+                <ClockIcon width={16} height={16} />
+                <span>Восстановить чат</span>
+              </button>
+            </div>
           </div>
 
-          {currentChatId && (
+          {activeChats.length > 0 && (
             <div className="control-section">
-              <h3>Текущий чат</h3>
-              <div className="chat-info">
-                <div className="chat-id">#{currentChatId}</div>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={closeChat}
-                  disabled={loading}
-                >
-                  Закрыть чат
-                </button>
+              <h3>Открытые заявки</h3>
+              <div className="tickets-list">
+                {activeChats.map((chatId) => (
+                  <button
+                    key={chatId}
+                    type="button"
+                    className={`ticket-item ${currentChatId === chatId ? 'ticket-item--active' : ''}`}
+                    onClick={() => setCurrentChatId(chatId)}
+                  >
+                    <MessageSquareIcon width={16} height={16} />
+                    <span>Заявка №{chatId}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -201,12 +202,18 @@ export default function OperatorPage() {
           <div className="connection-status">
             {renderConnectionStatus()}
           </div>
+
           <div className="session-chip">
             <div className="session-info">
               <b>{fullName}</b>
               <span>{user?.email || ''}</span>
             </div>
-            <button type="button" className="session-logout" title="Выйти" onClick={handleLogout}>
+            <button
+              type="button"
+              className="session-logout"
+              title="Выйти"
+              onClick={handleLogout}
+            >
               <LogOutIcon width={15} height={15} />
             </button>
           </div>
@@ -238,8 +245,8 @@ export default function OperatorPage() {
             <div className="empty-icon">
               <MessageSquareIcon width={64} height={64} />
             </div>
-            <h2>Нет активного чата</h2>
-            <p>Нажмите "Получить чат", чтобы начать работу с очередью</p>
+            <h2>Нет активной заявки</h2>
+            <p>Нажмите "Получить заявку", чтобы начать работу с очередью</p>
             <button
               type="button"
               className="btn btn-primary btn-lg"
@@ -247,7 +254,7 @@ export default function OperatorPage() {
               disabled={loading || connectionStatus !== WS_CONNECTION_STATUS.CONNECTED}
             >
               <MessageSquareIcon width={20} height={20} />
-              <span>Получить чат из очереди</span>
+              <span>Получить заявку из очереди</span>
             </button>
           </div>
         )}

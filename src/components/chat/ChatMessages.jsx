@@ -35,12 +35,10 @@ export default function ChatMessages({ messages, messagesEndRef, loading }) {
 
     messages.forEach((message) => {
       const date = formatDate(message);
-
       if (date !== currentDate) {
         currentDate = date;
         groups.push({ date, messages: [] });
       }
-
       groups[groups.length - 1].messages.push(message);
     });
 
@@ -51,7 +49,7 @@ export default function ChatMessages({ messages, messagesEndRef, loading }) {
     <div className="chat-messages">
       {messages.length === 0 ? (
         <div className="messages-empty">
-          <p>Нет сообщений в этом чате</p>
+          <p>Нет сообщений в этой заявке</p>
         </div>
       ) : (
         <>
@@ -64,7 +62,7 @@ export default function ChatMessages({ messages, messagesEndRef, loading }) {
               {group.messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`message ${message.incoming ? 'message-incoming' : 'message-outgoing'} ${message.sending ? 'message-sending' : ''}`}
+                  className={`message ${message.incoming ? 'message-incoming' : 'message-outgoing'}${message.sending ? 'message-sending' : ''}`}
                 >
                   <div className="message-bubble">
                     <div className="message-text">{message.message}</div>

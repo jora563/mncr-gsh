@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { operatorWS, WS_EVENT_TYPES, WS_CONNECTION_STATUS } from '../services/websocket.js';
+import { OperatorWebSocket, operatorWS, WS_EVENT_TYPES, WS_CONNECTION_STATUS } from '../services/websocket.js';
 import { useToast } from '../providers/toast/useToast.js';
 import { CHAT_STATUSES } from '../constants.js';
 
@@ -17,17 +17,18 @@ function isIncoming(msg) {
  * Хук для управления операторским чатом через WebSocket
  */
 export function useOperatorChat() {
-  const [connectionStatus, setConnectionStatus] = useState(WS_CONNECTION_STATUS.DISCONNECTED);
+  const [mainConnectionStatus, setMainConnectionStatus] = useState(WS_CONNECTION_STATUS.DISCONNECTED);
+  const [chats, setChats] = useState({});
+  const [activeChats, setActiveChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [operatorStatus, setOperatorStatus] = useState(1); // 1 = online, 0 = offline
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const toast = useToast();
   const messagesEndRef = useRef(null);
-  // Синхронный дубль currentChatId: WS-обработчики не должны читать устаревший
-  // state (гонка между setState и приходом ответа по WS)
+  const chatWsMap = useRef({});
+  const activeChatsRef = useRef([]);
   const currentChatIdRef = useRef(null);
 
   /**
@@ -39,6 +40,14 @@ export function useOperatorChat() {
     return () => clearTimeout(timer);
   }, [error]);
 
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId;
+  }, [currentChatId]);
+
+  useEffect(() => {
+    activeChatsRef.current = activeChats;
+  }, [activeChats]);
+
   /**
    * Прокрутка к последнему сообщению
    */
@@ -47,158 +56,80 @@ export function useOperatorChat() {
   }, []);
 
   /**
-   * Назначить активный чат: ref синхронно, state для React
-   */
-  const setActiveChat = useCallback((chatId) => {
-    currentChatIdRef.current = chatId;
-    setCurrentChatId(chatId);
-    setMessages([]);
-  }, []);
-
-  /**
-   * Загрузка истории сообщений
-   */
-  const loadHistory = useCallback(async (chatId, afterMessageId = 0, size = 50) => {
-    if (!chatId) return;
-
-    try {
-      setLoading(true);
-      await operatorWS.getMessageHistory(chatId, afterMessageId, size);
-    } catch {
-      toast.error('Не удалось загрузить историю');
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  /**
-   * Upsert сообщений по id.
-   * replace=true — полная замена (история), иначе — дозапись без дубликатов.
-   * Защита от того, что бэкенд при сообщении клиента пересылает всю историю
-   * как IncomingMessage.
-   */
-  const upsertMessages = useCallback((incoming, replace) => {
-    setMessages((prev) => {
-      const normalized = incoming.map((msg) => ({ ...msg, incoming: isIncoming(msg) }));
-      if (replace) {
-        return normalized.sort((a, b) => a.id - b.id);
-      }
-      const byId = new Map(prev.map((m) => [m.id, m]));
-      for (const msg of normalized) byId.set(msg.id, msg);
-      return [...byId.values()].sort((a, b) => a.id - b.id);
-    });
-    setTimeout(scrollToBottom, 100);
-  }, [scrollToBottom]);
-
-  /**
    * Обработка входящего сообщения
    */
-  const handleIncomingMessage = useCallback((payload) => {
-    const { chatId, ...message } = payload;
+  const handleIncomingMessage = useCallback((targetChatId, message) => {
+    setChats((prev) => {
+      const chatData = prev[targetChatId];
+      if (!chatData) return prev;
 
-    if (chatId === currentChatIdRef.current) {
-      upsertMessages([message], false);
+      const normalized = { ...message, incoming: isIncoming(message) };
+      const byId = new Map(chatData.messages.map((m) => [m.id, m]));
+      byId.set(normalized.id, normalized);
+      const newMessages = [...byId.values()].sort((a, b) => a.id - b.id);
+
+      return {
+        ...prev,
+        [targetChatId]: { ...chatData, messages: newMessages },
+      };
+    });
+    if (targetChatId === currentChatIdRef.current) {
+      setTimeout(scrollToBottom, 100);
     }
-  }, [upsertMessages]);
+  }, [scrollToBottom]);
 
   /**
    * Обработка получения истории сообщений
    */
-  const handleMessageHistory = useCallback((payload) => {
-    const { chatId, messages: history } = payload;
+  const handleMessageHistory = useCallback((targetChatId, history) => {
+    setChats((prev) => {
+      const chatData = prev[targetChatId];
+      if (!chatData) return prev;
 
-    if (chatId === currentChatIdRef.current) {
-      upsertMessages(history, true);
+      const normalized = history.map((msg) => ({ ...msg, incoming: isIncoming(msg) }));
+      return {
+        ...prev,
+        [targetChatId]: { ...chatData, messages: normalized.sort((a, b) => a.id - b.id) },
+      };
+    });
+    if (targetChatId === currentChatIdRef.current) {
+      setTimeout(scrollToBottom, 100);
     }
-  }, [upsertMessages]);
+  }, [scrollToBottom]);
 
   /**
    * Обработка подтверждения отправки сообщения
    */
-  const handleMessageSent = useCallback((payload) => {
-    // Сервер подтвердил получение нашего сообщения
+  const handleMessageSent = useCallback((targetChatId, payload) => {
     if (payload && payload.id) {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.sending ? { ...msg, sending: false, incoming: false, ...payload } : msg,
-        ),
-      );
+      setChats((prev) => {
+        const chatData = prev[targetChatId];
+        if (!chatData) return prev;
+        return {
+          ...prev,
+          [targetChatId]: {
+            ...chatData,
+            messages: chatData.messages.map((msg) =>
+              msg.sending ? { ...msg, sending: false, incoming: false, ...payload } : msg
+            ),
+          },
+        };
+      });
     }
   }, []);
 
-  /**
-   * Обработка получения чата из очереди
-   */
-  const handleQueuedChat = useCallback((payload) => {
-    const { chatId } = payload;
-
-    if (chatId !== null && chatId !== undefined) {
-      setActiveChat(chatId);
-      toast.info(`Назначен чат #${chatId}`);
-      // Загружаем историю для нового чата
-      loadHistory(chatId);
-    } else {
-      toast.info('В очереди пока нет чатов');
-    }
-  }, [toast, loadHistory, setActiveChat]);
-
-  /**
-   * Обработка восстановления чата
-   */
-  const handleChatRestored = useCallback((payload) => {
-    const { chatId } = payload;
-
-    if (chatId !== null && chatId !== undefined) {
-      setActiveChat(chatId);
-      toast.info(`Восстановлен чат #${chatId}`);
-      loadHistory(chatId);
-    } else {
-      toast.info('Нет активного чата для восстановления');
-    }
-  }, [toast, loadHistory, setActiveChat]);
-
-  /**
-   * Обработка присоединения к чату по ID
-   */
-  const handleChatJoined = useCallback((payload) => {
-    const { chatId } = payload;
-
-    setActiveChat(chatId);
-    toast.success(`Присоединились к чату #${chatId}`);
-    loadHistory(chatId);
-  }, [toast, loadHistory, setActiveChat]);
-
-  /**
-   * Обработка ошибок
-   */
-  const handleError = useCallback((payload) => {
-    const { error_text } = payload;
-    setError(error_text);
-    toast.error(error_text);
+  const setupChatWsState = useCallback((ws, chatId) => {
+    ws.chatId = chatId;
+    chatWsMap.current[chatId] = ws;
+    setActiveChats((prev) => (prev.includes(chatId) ? prev : [...prev, chatId]));
+    setChats((prev) => ({ ...prev, [chatId]: { messages: [] } }));
+    setCurrentChatId((prev) => prev || chatId);
+    toast.success(`Назначена заявка №${chatId}`);
+    ws.getMessageHistory(chatId, 0, 50).catch(() => toast.error('Не удалось загрузить историю'));
   }, [toast]);
 
   /**
-   * Подписка на события WebSocket
-   */
-  useEffect(() => {
-    const unsubscribers = [
-      operatorWS.on('connectionStatusChanged', setConnectionStatus),
-      operatorWS.on(WS_EVENT_TYPES.INCOMING_MESSAGE, handleIncomingMessage),
-      operatorWS.on(WS_EVENT_TYPES.MESSAGE_HISTORY_GOT, handleMessageHistory),
-      operatorWS.on(WS_EVENT_TYPES.MESSAGE_SENT, handleMessageSent),
-      operatorWS.on(WS_EVENT_TYPES.QUEUED_CHAT_GOT, handleQueuedChat),
-      operatorWS.on(WS_EVENT_TYPES.CHAT_RESTORED, handleChatRestored),
-      operatorWS.on(WS_EVENT_TYPES.CHAT_BY_ID_JOINED, handleChatJoined),
-      operatorWS.on(WS_EVENT_TYPES.ERROR, handleError),
-    ];
-
-    return () => {
-      unsubscribers.forEach((unsub) => unsub());
-    };
-  }, [handleIncomingMessage, handleMessageHistory, handleMessageSent, handleQueuedChat, handleChatRestored, handleChatJoined, handleError]);
-
-  /**
-   * Подключение к WebSocket
+   * Подключение главного WebSocket (только для статусов)
    */
   const connect = useCallback(async () => {
     try {
@@ -214,93 +145,166 @@ export function useOperatorChat() {
   }, [toast]);
 
   /**
-   * Отключение от WebSocket
+   * Отключение от всех WebSocket
    */
   const disconnect = useCallback(() => {
+    Object.values(chatWsMap.current).forEach((ws) => ws.disconnect());
+    chatWsMap.current = {};
+    setActiveChats([]);
+    setChats({});
+    setCurrentChatId(null);
     operatorWS.disconnect();
   }, []);
+
+  /**
+   * Запрос следующего чата из очереди через НОВОЕ соединение
+   */
+  const getNextChat = useCallback(async (tags = []) => {
+    if (mainConnectionStatus !== WS_CONNECTION_STATUS.CONNECTED) {
+      toast.error('Нет подключения к серверу');
+      return;
+    }
+    let tempWs = null;
+    try {
+      setLoading(true);
+      tempWs = new OperatorWebSocket();
+
+      tempWs.on(WS_EVENT_TYPES.INCOMING_MESSAGE, (payload) => {
+        if (tempWs.chatId) {
+          const { chatId: msgChatId, ...message } = payload;
+          handleIncomingMessage(msgChatId || tempWs.chatId, message);
+        }
+      });
+      tempWs.on(WS_EVENT_TYPES.MESSAGE_HISTORY_GOT, (payload) => {
+        if (tempWs.chatId) {
+          const { chatId: msgChatId, messages: history } = payload;
+          handleMessageHistory(msgChatId || tempWs.chatId, history);
+        }
+      });
+      tempWs.on(WS_EVENT_TYPES.MESSAGE_SENT, (payload) => {
+        if (tempWs.chatId) {
+          handleMessageSent(tempWs.chatId, payload);
+        }
+      });
+
+      await tempWs.connect();
+      await tempWs.waitForOpen();
+
+      const response = await tempWs.getQueuedChat(tags);
+      const chatId = response.data?.chatId;
+
+      if (chatId !== null && chatId !== undefined) {
+        setupChatWsState(tempWs, chatId);
+      } else {
+        toast.info('В очереди пока нет заявок');
+        tempWs.disconnect();
+      }
+    } catch (err) {
+      toast.error(`Ошибка получения заявки: ${err.message}`);
+      if (tempWs) tempWs.disconnect();
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, setupChatWsState, mainConnectionStatus, handleIncomingMessage, handleMessageHistory, handleMessageSent]);
+
+  /**
+   * Восстановление предыдущего чата через НОВОЕ соединение
+   */
+  const restoreChat = useCallback(async () => {
+    if (mainConnectionStatus !== WS_CONNECTION_STATUS.CONNECTED) {
+      toast.error('Нет подключения к серверу');
+      return;
+    }
+    let tempWs = null;
+    try {
+      setLoading(true);
+      tempWs = new OperatorWebSocket();
+
+      tempWs.on(WS_EVENT_TYPES.INCOMING_MESSAGE, (payload) => {
+        if (tempWs.chatId) {
+          const { chatId: msgChatId, ...message } = payload;
+          handleIncomingMessage(msgChatId || tempWs.chatId, message);
+        }
+      });
+      tempWs.on(WS_EVENT_TYPES.MESSAGE_HISTORY_GOT, (payload) => {
+        if (tempWs.chatId) {
+          const { chatId: msgChatId, messages: history } = payload;
+          handleMessageHistory(msgChatId || tempWs.chatId, history);
+        }
+      });
+      tempWs.on(WS_EVENT_TYPES.MESSAGE_SENT, (payload) => {
+        if (tempWs.chatId) {
+          handleMessageSent(tempWs.chatId, payload);
+        }
+      });
+
+      await tempWs.connect();
+      await tempWs.waitForOpen();
+
+      const response = await tempWs.restoreChat();
+      const chatId = response.data?.chatId;
+
+      if (chatId !== null && chatId !== undefined) {
+        setupChatWsState(tempWs, chatId);
+      } else {
+        toast.info('Нет активной заявки для восстановления');
+        tempWs.disconnect();
+      }
+    } catch (err) {
+      toast.error(`Ошибка восстановления заявки: ${err.message}`);
+      if (tempWs) tempWs.disconnect();
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, setupChatWsState, mainConnectionStatus, handleIncomingMessage, handleMessageHistory, handleMessageSent]);
 
   /**
    * Отправка сообщения
    */
   const sendMessage = useCallback(async (text) => {
     const chatId = currentChatIdRef.current;
-    if (!chatId) {
-      toast.error('Нет активного чата');
+    if (!chatId || !chatWsMap.current[chatId]) {
+      toast.error('Нет активной заявки');
       return;
     }
-
     if (!text.trim()) {
       return;
     }
 
+    const ws = chatWsMap.current[chatId];
     const tempId = crypto.randomUUID();
 
     try {
       setLoading(true);
+      setChats((prev) => {
+        const chatData = prev[chatId];
+        if (!chatData) return prev;
+        return {
+          ...prev,
+          [chatId]: {
+            ...chatData,
+            messages: [
+              ...chatData.messages,
+              { id: tempId, message: text, dateTime: new Date().toISOString(), sending: true, incoming: false },
+            ],
+          },
+        };
+      });
 
-      // Добавляем сообщение в локальный список с пометкой "отправляется"
-      setMessages((prev) => [
-        ...prev,
-        { id: tempId, message: text, dateTime: new Date().toISOString(), sending: true, incoming: false },
-      ]);
-
-      const response = await operatorWS.sendMessage(chatId, text);
-
-      // Обновляем сообщение после успешной отправки
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === tempId ? { ...msg, sending: false, incoming: false, ...response.data } : msg,
-        ),
-      );
-
-      setTimeout(scrollToBottom, 100);
+      await ws.sendMessage(chatId, text);
     } catch {
       toast.error('Не удалось отправить сообщение');
-      // Удаляем сообщение из списка
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-    } finally {
-      setLoading(false);
-    }
-  }, [scrollToBottom, toast]);
-
-  /**
-   * Запрос следующего чата из очереди
-   */
-  const getNextChat = useCallback(async (tags = []) => {
-    try {
-      setLoading(true);
-      await operatorWS.getQueuedChat(tags);
-    } catch (err) {
-      toast.error(`Ошибка получения чата: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  /**
-   * Восстановление предыдущего чата
-   */
-  const restoreChat = useCallback(async () => {
-    try {
-      setLoading(true);
-      await operatorWS.restoreChat();
-    } catch {
-      toast.error('Не удалось восстановить чат');
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  /**
-   * Присоединение к чату по ID
-   */
-  const joinChat = useCallback(async (chatId) => {
-    try {
-      setLoading(true);
-      await operatorWS.joinChatById(chatId);
-    } catch {
-      toast.error('Не удалось присоединиться к чату');
+      setChats((prev) => {
+        const chatData = prev[chatId];
+        if (!chatData) return prev;
+        return {
+          ...prev,
+          [chatId]: {
+            ...chatData,
+            messages: chatData.messages.filter((msg) => msg.id !== tempId),
+          },
+        };
+      });
     } finally {
       setLoading(false);
     }
@@ -311,24 +315,32 @@ export function useOperatorChat() {
    */
   const closeChat = useCallback(async () => {
     const chatId = currentChatIdRef.current;
-    if (!chatId) return;
+    if (!chatId || !chatWsMap.current[chatId]) return;
+
+    const ws = chatWsMap.current[chatId];
 
     try {
       setLoading(true);
-      await operatorWS.changeChatStatus(chatId, CHAT_STATUSES.CLOSED);
-      currentChatIdRef.current = null;
-      setCurrentChatId(null);
-      setMessages([]);
-      toast.success('Чат закрыт');
+      await ws.changeChatStatus(chatId, CHAT_STATUSES.CLOSED);
+      ws.disconnect();
+      delete chatWsMap.current[chatId];
+      setActiveChats((prev) => prev.filter((id) => id !== chatId));
+      setChats((prev) => {
+        const next = { ...prev };
+        delete next[chatId];
+        return next;
+      });
+      setCurrentChatId((prev) => (prev === chatId ? (activeChatsRef.current.find((id) => id !== chatId) || null) : prev));
+      toast.success('Заявка закрыта');
     } catch {
-      toast.error('Не удалось закрыть чат');
+      toast.error('Не удалось закрыть заявку');
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   /**
-   * Изменение статуса оператора
+   * Изменение статуса оператора (через главное соединение)
    */
   const changeStatus = useCallback(async (status) => {
     try {
@@ -340,17 +352,45 @@ export function useOperatorChat() {
   }, [toast]);
 
   /**
+   * Загрузка истории сообщений
+   */
+  const loadHistory = useCallback((chatId = currentChatIdRef.current, afterMessageId = 0, size = 50) => {
+    if (!chatId || !chatWsMap.current[chatId]) return;
+    const ws = chatWsMap.current[chatId];
+    ws.getMessageHistory(chatId, afterMessageId, size).catch(() => {
+      toast.error('Не удалось загрузить историю');
+    });
+  }, [toast]);
+
+  /**
    * Автопрокрутка при новых сообщениях
    */
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (currentChatId && chats[currentChatId]?.messages) {
+      scrollToBottom();
+    }
+  }, [chats, currentChatId, scrollToBottom]);
+
+  /**
+   * Подписка на статус главного соединения и глобальные ошибки
+   */
+  useEffect(() => {
+    const unsub = operatorWS.on('connectionStatusChanged', setMainConnectionStatus);
+    const unsubErr = operatorWS.on(WS_EVENT_TYPES.ERROR, (payload) => {
+      setError(payload.error_text);
+      toast.error(payload.error_text);
+    });
+    return () => { unsub(); unsubErr(); };
+  }, [toast]);
+
+  const currentChatData = chats[currentChatId] || { messages: [] };
 
   return {
     // Состояние
-    connectionStatus,
+    connectionStatus: mainConnectionStatus,
     currentChatId,
-    messages,
+    activeChats,
+    messages: currentChatData.messages,
     operatorStatus,
     loading,
     error,
@@ -362,9 +402,9 @@ export function useOperatorChat() {
     sendMessage,
     getNextChat,
     restoreChat,
-    joinChat,
     loadHistory: () => loadHistory(currentChatIdRef.current),
     closeChat,
     changeStatus,
+    setCurrentChatId,
   };
 }

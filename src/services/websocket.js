@@ -54,12 +54,13 @@ export const WS_CONNECTION_STATUS = {
  * WebSocket клиент для работы с операторским API.
  *
  * Формат сообщений бэкенда (core/src/http_server/operator_api/ws_protocol):
- *   внешний конверт: { "kind": "Request" | "Event", "data": <внутреннее> }
- *   внутреннее:      { "id": <u128 число>, "request_id"?: <u128>, "type": <имя>, "data": <payload> }
+ * внешний конверт: { "kind": "Request" \| "Event", "data": <внутреннее> }
+ * внутреннее: { "id": <u128 число>, "request_id"?: <u128>, "type": <имя>, "data": <payload> }
  */
-class OperatorWebSocket {
+export class OperatorWebSocket {
   constructor() {
     this.ws = null;
+    this.chatId = null;
     this.connectionStatus = WS_CONNECTION_STATUS.DISCONNECTED;
     this.listeners = new Map();
     this.pendingRequests = new Map();
@@ -67,6 +68,7 @@ class OperatorWebSocket {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000;
     this.shouldReconnect = true;
+
     // Счётчик id запросов: число, чтобы serde парсил его как u128,
     // и чтобы JS не терял точность
     this.idSeq = 0;
@@ -76,7 +78,10 @@ class OperatorWebSocket {
    * Подключение к WebSocket серверу
    */
   async connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
@@ -95,20 +100,65 @@ class OperatorWebSocket {
       // поэтому токен передаётся в query-параметре, а прокси перекладывает
       // его в заголовок (см. vite.config.js)
       const url = `${getWebSocketUrl()}?token=${encodeURIComponent(token)}`;
-
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => this.handleOpen();
       this.ws.onmessage = (event) => this.handleMessage(event);
       this.ws.onerror = () => this.handleError();
       this.ws.onclose = (event) => this.handleClose(event);
-
     } catch (error) {
       this.connectionStatus = WS_CONNECTION_STATUS.ERROR;
       this.emit('connectionStatusChanged', this.connectionStatus);
       this.emit('error', { error_text: error.message });
       this.scheduleReconnect();
+      throw error;
     }
+  }
+
+  /**
+   * Ожидание открытия соединения
+   */
+  async waitForOpen() {
+    // Ждем, пока connect() не создаст this.ws
+    let attempts = 0;
+    while (!this.ws && attempts < 50) {
+      await new Promise((r) => setTimeout(r, 10));
+      attempts++;
+    }
+    if (!this.ws) {
+      throw new Error('WebSocket не инициализирован');
+    }
+
+    if (this.ws.readyState === WebSocket.OPEN) {
+      return;
+    }
+    if (this.ws.readyState === WebSocket.CLOSING || this.ws.readyState === WebSocket.CLOSED) {
+      throw new Error('WebSocket закрыт');
+    }
+
+    return new Promise((resolve, reject) => {
+      const onOpen = () => {
+        this.ws.removeEventListener('open', onOpen);
+        this.ws.removeEventListener('error', onError);
+        this.ws.removeEventListener('close', onClose);
+        resolve();
+      };
+      const onError = () => {
+        this.ws.removeEventListener('open', onOpen);
+        this.ws.removeEventListener('error', onError);
+        this.ws.removeEventListener('close', onClose);
+        reject(new Error('Ошибка подключения'));
+      };
+      const onClose = () => {
+        this.ws.removeEventListener('open', onOpen);
+        this.ws.removeEventListener('error', onError);
+        this.ws.removeEventListener('close', onClose);
+        reject(new Error('Соединение закрыто'));
+      };
+      this.ws.addEventListener('open', onOpen);
+      this.ws.addEventListener('error', onError);
+      this.ws.addEventListener('close', onClose);
+    });
   }
 
   /**
@@ -122,12 +172,13 @@ class OperatorWebSocket {
 
   /**
    * Обработка входящих сообщений.
-   * Сервер шлёт конверт { kind: "Event", data: { id, request_id?, type, data } }.
+   * Сервер шлёт конверт { kind: "Event", data: { id, request_id?, type, data }}.
    */
   handleMessage(event) {
     try {
       const envelope = JSON.parse(event.data);
       const inner = envelope.kind ? envelope.data : envelope;
+
       if (!inner) {
         return;
       }
@@ -139,11 +190,13 @@ class OperatorWebSocket {
       if (request_id != null && this.pendingRequests.has(request_id)) {
         const { resolve, reject } = this.pendingRequests.get(request_id);
         this.pendingRequests.delete(request_id);
+
         if (type === WS_EVENT_TYPES.ERROR) {
           reject(new Error(payload?.error_text || 'Ошибка сервера'));
         } else {
           resolve({ type, data: payload, id: inner.id });
         }
+
         this.emit(type, payload, { id: inner.id, request_id });
         return;
       }
@@ -159,7 +212,6 @@ class OperatorWebSocket {
 
       // Эмитим событие для всех слушателей
       this.emit(type, payload, { id: inner.id, request_id });
-
     } catch {
       this.emit('error', { error_text: 'Ошибка парсинга сообщения' });
     }
@@ -215,7 +267,7 @@ class OperatorWebSocket {
 
   /**
    * Отправка запроса и ожидание ответа.
-   * Конверт: { kind: "Request", data: { id, type, data } }
+   * Конверт: { kind: "Request", data: { id, type, data }}
    */
   async sendRequest(type, data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -224,7 +276,6 @@ class OperatorWebSocket {
 
     this.idSeq += 1;
     const id = this.idSeq;
-
     const envelope = {
       kind: 'Request',
       data: {
@@ -391,5 +442,5 @@ class OperatorWebSocket {
   }
 }
 
-// Создаём и экспортируем единственный экземпляр
+// Создаём и экспортируем единственный экземпляр для главного соединения
 export const operatorWS = new OperatorWebSocket();
