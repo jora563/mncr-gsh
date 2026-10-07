@@ -548,16 +548,17 @@
 .job-logs {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text);
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  max-height: 260px;
-  overflow: auto;
+  border-radius: 9px;
+  padding: 14px 16px;
+  max-height: 280px;
+  overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  margin: 0;
 }
 
 /* ============ АДАПТИВНОСТЬ (ОПЕРАТОР) ============ */
