@@ -18,11 +18,21 @@ export function useApiQuery(queryFn) {
     }
   }, [queryFn]);
 
+  const silentRefetch = useCallback(async () => {
+    setError(null);
+    try {
+      const result = await queryFn();
+      setData(result);
+    } catch (err) {
+      setError(err.message || 'Ошибка загрузки данных');
+    }
+  }, [queryFn]);
+
   useEffect(() => {
     queueMicrotask(() => {
       refetch();
     });
   }, [refetch]);
 
-  return { data, loading, error, refetch };
+  return { data, loading, error, refetch, silentRefetch };
 }

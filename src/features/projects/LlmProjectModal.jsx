@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, Fragment } from 'react';
+import { useState, useCallback, useRef, useEffect, Fragment } from 'react';
 import Modal from '../../components/modals/Modal.jsx';
 import ConfirmDialog from '../../components/modals/ConfirmDialog.jsx';
 import Field from '../../components/forms/Field.jsx';
@@ -10,6 +10,7 @@ import { formatDateParts } from '../../utils/format.js';
 
 function FileUploadField({ label, hint, accept, fileName, busy, onSelect }) {
   const inputRef = useRef(null);
+
   return (
     <Field label={label} hint={hint}>
       <div className="actions">
@@ -28,6 +29,8 @@ export default function LlmProjectModal({ project, onClose }) {
   const [expandedJob, setExpandedJob] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState({ knowledge: '', dataset: '', questions: '' });
   const [deleteLlmTarget, setDeleteLlmTarget] = useState(null);
+  const logsRef = useRef(null);
+  const trainingJobsRef = useRef(null);
 
   const fetchProject = useCallback(
     () => api.getLlmProject(project.code).catch(() => null),
@@ -43,37 +46,41 @@ export default function LlmProjectModal({ project, onClose }) {
     );
   }, [project.code]);
 
-  const { data: llmProject, loading: loadingProject, refetch: refetchProject } = useApiQuery(fetchProject);
-  const { data: trainingJobs, loading: loadingJobs, refetch: refetchJobs } = useApiQuery(fetchJobs);
+  const { data: llmProject, loading: loadingProject, silentRefetch: silentRefetchProject } = useApiQuery(fetchProject);
+  const { data: trainingJobs, loading: loadingJobs, silentRefetch: silentRefetchJobs } = useApiQuery(fetchJobs);
 
   const loading = loadingProject || loadingJobs;
-
   const hasActiveJob = Array.isArray(trainingJobs) && trainingJobs.some((job) => job.status === 'pending' || job.status === 'running');
+
+  // Храним актуальные данные для доступа внутри интервала
+  useEffect(() => {
+    trainingJobsRef.current = trainingJobs;
+  }, [trainingJobs]);
 
   const { run: uploadKnowledge, busy: uploadingKnowledge } = useMutation({
     mutateFn: async (formData) => api.uploadLlmKnowledge(formData),
     onSuccessMessage: 'База знаний загружена.',
-    onAfter: () => refetchProject(),
+    onAfter: () => silentRefetchProject(),
   });
 
   const { run: uploadDataset, busy: uploadingDataset } = useMutation({
     mutateFn: async (formData) => api.uploadLlmDataset(formData),
     onSuccessMessage: 'Датасет загружен.',
-    onAfter: () => refetchProject(),
+    onAfter: () => silentRefetchProject(),
   });
 
   const { run: uploadQuestions, busy: uploadingQuestions } = useMutation({
     mutateFn: async (formData) => api.uploadLlmQuestions(formData),
     onSuccessMessage: 'Вопросы загружены.',
-    onAfter: () => refetchProject(),
+    onAfter: () => silentRefetchProject(),
   });
 
   const { run: startTraining, busy: training } = useMutation({
     mutateFn: async () => api.startLlmTraining({ project_id: project.code }),
     onSuccessMessage: 'Обучение запущено.',
     onAfter: () => {
-      refetchProject();
-      refetchJobs();
+      silentRefetchProject();
+      silentRefetchJobs();
     },
   });
 
@@ -81,23 +88,23 @@ export default function LlmProjectModal({ project, onClose }) {
     mutateFn: async () => api.reloadLlmProject({ project_id: project.code }),
     onSuccessMessage: 'Проект перезапущен.',
     onAfter: () => {
-      refetchProject();
-      refetchJobs();
+      silentRefetchProject();
+      silentRefetchJobs();
     },
   });
 
   const { run: resumeJob, busy: resuming } = useMutation({
     mutateFn: (jobId) => api.resumeLlmTraining(jobId),
     onSuccessMessage: 'Обучение продолжено.',
-    onAfter: () => refetchJobs(),
+    onAfter: () => silentRefetchJobs(),
   });
 
   const { run: createProjectInLlm, busy: creating } = useMutation({
     mutateFn: async () => api.createLlmProject({ project_id: project.code, name: project.project_name }),
     onSuccessMessage: 'Проект создан в LLM.',
     onAfter: () => {
-      refetchProject();
-      refetchJobs();
+      silentRefetchProject();
+      silentRefetchJobs();
     },
   });
 
@@ -106,8 +113,8 @@ export default function LlmProjectModal({ project, onClose }) {
     onSuccessMessage: 'Проект удалён из LLM.',
     onAfter: () => {
       setDeleteLlmTarget(null);
-      refetchProject();
-      refetchJobs();
+      silentRefetchProject();
+      silentRefetchJobs();
     },
   });
 
@@ -140,9 +147,66 @@ export default function LlmProjectModal({ project, onClose }) {
     setActiveTab(tabId);
   };
 
-  const effectiveActiveTab = dataTabsDisabled && (activeTab === 'data' || activeTab === 'training')
-    ? 'info'
-    : activeTab;
+  const effectiveActiveTab =
+    dataTabsDisabled && (activeTab === 'data' || activeTab === 'training')
+      ? 'info'
+      : activeTab;
+
+  // Автопрокрутка логов в конец
+  const scrollToBottom = useCallback(() => {
+    if (logsRef.current) {
+      logsRef.current.scrollTop = logsRef.current.scrollHeight;
+    }
+  }, []);
+
+  // Автоматическое обновление логов
+  // Останавливается если джоб не в активном состоянии (не pending/running)
+  useEffect(() => {
+    if (!expandedJob) {
+      return;
+    }
+
+    const refreshInterval = parseInt(import.meta.env.VITE_LLM_LOGS_REFRESH_INTERVAL, 10) || 5000;
+    let intervalId = null;
+
+    const refreshLogs = async () => {
+      try {
+        // Проверяем актуальный статус джоба из ref
+        const jobs = trainingJobsRef.current;
+        const currentJob = Array.isArray(jobs)
+          ? jobs.find((job) => job.job_id === expandedJob)
+          : null;
+
+        // Если джоб не найден или не в активном состоянии - останавливаем обновление
+        if (!currentJob || (currentJob.status !== 'pending' && currentJob.status !== 'running')) {
+          if (intervalId !== null) {
+            clearInterval(intervalId);
+          }
+          return;
+        }
+
+        await silentRefetchJobs();
+        setTimeout(scrollToBottom, 100);
+      } catch (error) {
+        console.error('Error refreshing job logs:', error);
+      }
+    };
+
+    intervalId = setInterval(refreshLogs, refreshInterval);
+
+    return () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [expandedJob, silentRefetchJobs, scrollToBottom]);
+
+  // Прокрутка при первом раскрытии логов
+  useEffect(() => {
+    if (expandedJob) {
+      setTimeout(scrollToBottom, 200);
+    }
+  }, [expandedJob, scrollToBottom]);
 
   return (
     <>
@@ -207,6 +271,7 @@ export default function LlmProjectModal({ project, onClose }) {
                     Проект ещё не создан в LLM.
                   </div>
                 )}
+
                 <div className="actions" style={{ justifyContent: 'space-between' }}>
                   {llmProject ? (
                     <>
@@ -245,30 +310,30 @@ export default function LlmProjectModal({ project, onClose }) {
 
             {effectiveActiveTab === 'data' && (
               <div className="tab-content">
-              <FileUploadField
-              label="База знаний (CSV)"
-              hint="Вопросы и ответы в формате CSV"
-              accept=".csv"
-              fileName={uploadedFiles.knowledge}
-              busy={uploadingKnowledge || hasActiveJob}
-              onSelect={(e) => handleFileUpload(e, 'knowledge', uploadKnowledge)}
-              />
-              <FileUploadField
-              label="Датасет (JSONL)"
-              hint="Данные в формате JSONL"
-              accept=".jsonl,.json"
-              fileName={uploadedFiles.dataset}
-              busy={uploadingDataset || hasActiveJob}
-              onSelect={(e) => handleFileUpload(e, 'dataset', uploadDataset)}
-              />
-              <FileUploadField
-              label="Типичные вопросы (TXT)"
-              hint="Каждый вопрос на новой строке"
-              accept=".txt"
-              fileName={uploadedFiles.questions}
-              busy={uploadingQuestions || hasActiveJob}
-              onSelect={(e) => handleFileUpload(e, 'questions', uploadQuestions)}
-              />
+                <FileUploadField
+                  label="База знаний (CSV)"
+                  hint="Вопросы и ответы в формате CSV"
+                  accept=".csv"
+                  fileName={uploadedFiles.knowledge}
+                  busy={uploadingKnowledge || hasActiveJob}
+                  onSelect={(e) => handleFileUpload(e, 'knowledge', uploadKnowledge)}
+                />
+                <FileUploadField
+                  label="Датасет (JSONL)"
+                  hint="Данные в формате JSONL"
+                  accept=".jsonl,.json"
+                  fileName={uploadedFiles.dataset}
+                  busy={uploadingDataset || hasActiveJob}
+                  onSelect={(e) => handleFileUpload(e, 'dataset', uploadDataset)}
+                />
+                <FileUploadField
+                  label="Типичные вопросы (TXT)"
+                  hint="Каждый вопрос на новой строке"
+                  accept=".txt"
+                  fileName={uploadedFiles.questions}
+                  busy={uploadingQuestions || hasActiveJob}
+                  onSelect={(e) => handleFileUpload(e, 'questions', uploadQuestions)}
+                />
               </div>
             )}
 
@@ -313,7 +378,7 @@ export default function LlmProjectModal({ project, onClose }) {
                                 <td colSpan={4}>
                                   <div className="expansion-inner">
                                     <h4>Логи обучения</h4>
-                                    <pre className="job-logs">{job.logs || 'Логов пока нет.'}</pre>
+                                    <pre ref={logsRef} className="job-logs">{job.logs || 'Логов пока нет.'}</pre>
                                   </div>
                                 </td>
                               </tr>
@@ -326,6 +391,7 @@ export default function LlmProjectModal({ project, onClose }) {
                 ) : (
                   <div className="empty-state">Заданий обучения пока нет.</div>
                 )}
+
                 <div className="actions">
                   <button
                     type="button"
