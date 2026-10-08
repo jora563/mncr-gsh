@@ -5,6 +5,7 @@ import { WS_CONNECTION_STATUS } from '../services/websocket.js';
 import ChatHeader from '../components/chat/ChatHeader.jsx';
 import ChatMessages from '../components/chat/ChatMessages.jsx';
 import ChatInput from '../components/chat/ChatInput.jsx';
+import SettingsDropdown from '../components/SettingsDropdown.jsx';
 import {
   LogOutIcon,
   MessageSquareIcon,
@@ -112,7 +113,7 @@ export default function OperatorPage() {
       {/* Боковая панель управления */}
       <aside className="operator-sidebar">
         <div className="operator-logo">
-          <div className="logo-mark">A</div>
+          <SettingsDropdown />
           <div className="logo-text">
             AI-Omni
             <span>Панель оператора</span>
@@ -172,7 +173,7 @@ export default function OperatorPage() {
 
           {activeChats.length > 0 && (
             <div className="control-section">
-              <h3>Открытые заявки</h3>
+              <h3>Заявки в работе</h3>
               <div className="tickets-list">
                 {activeChats.map((chatId) => (
                   <button

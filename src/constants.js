@@ -1,4 +1,5 @@
 // ===== Хранилище (ключи sessionStorage/localStorage) =====
+
 export const STORAGE_KEYS = {
   THEME: 'aiomni.theme',
   ACCESS_TOKEN: 'access_token',
@@ -10,15 +11,19 @@ export const STORAGE_KEYS = {
 };
 
 // ===== Темы =====
+
 export const THEMES = {
   LIGHT: 'light',
   DARK: 'dark',
+  SYSTEM: 'system',
 };
 
 // ===== Тосты =====
+
 export const TOAST_TTL_MS = 4000;
 
 // ===== Статусы API-индикатора в сайдбаре =====
+
 export const API_STATUS = {
   CHECKING: 'checking',
   OK: 'ok',
@@ -26,6 +31,7 @@ export const API_STATUS = {
 };
 
 // ===== HTTP =====
+
 export const HTTP_STATUS = {
   UNAUTHORIZED: 401,
   BAD_REQUEST: 400,
@@ -45,6 +51,7 @@ export const STATUS_MESSAGES = {
 };
 
 // ===== Маршруты API =====
+
 export const API_ROUTES = {
   health: '/health',
   projectGroups: '/v1/admin_api/project_groups',
@@ -69,9 +76,11 @@ export const API_ROUTES = {
 };
 
 // ===== UI: градиенты аватаров =====
+
 export const GRADIENTS = ['grad-1', 'grad-2', 'grad-3', 'grad-4'];
 
 // ===== UI: известные платформы для бейджей =====
+
 export const KNOWN_PLATFORMS = [
   { match: 'telegram', className: 'badge--telegram' },
   { match: 'vk', className: 'badge--vk' },
@@ -79,12 +88,14 @@ export const KNOWN_PLATFORMS = [
 ];
 
 // ===== Статусы оператора =====
+
 export const OPERATOR_STATUSES = {
   ONLINE: 1,
   OFFLINE: 0,
 };
 
 // ===== Статусы чатов =====
+
 export const CHAT_STATUSES = {
   CLOSED: 2,
 };

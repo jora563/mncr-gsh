@@ -505,3 +505,77 @@ html[data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background: rgba(255,
 html[data-theme="dark"] *::-webkit-scrollbar-thumb:active { background: var(--primary); }
 
 * { scrollbar-width: thin; scrollbar-color: var(--border) var(--surface-2); }
+
+/* ============ SETTINGS DROPDOWN ============ */
+.settings-dropdown {
+  position: relative;
+}
+
+.settings-trigger {
+  border: none;
+}
+
+.settings-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  z-index: 100;
+  animation: slideDown .18s ease;
+}
+
+.settings-menu-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  padding: 8px 10px 6px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.settings-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-theme-options {
+  display: flex;
+  gap: 4px;
+}
+
+.settings-theme-option {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.settings-theme-option:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.settings-theme-option.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useTheme } from '../providers/theme/useTheme.js'
 import { useDashboardData } from '../hooks/useDashboardData.js'
 import StatsRow from '../components/dashboard/StatsRow.jsx'
 import ApiStatus from '../components/dashboard/ApiStatus.jsx'
@@ -7,7 +6,8 @@ import GroupsTab from '../features/groups/GroupsTab.jsx'
 import ProjectsTab from '../features/projects/ProjectsTab.jsx'
 import BotsTab from '../features/bots/BotsTab.jsx'
 import { keycloak } from '../services/keycloak.js'
-import { LayersIcon, BriefcaseIcon, BotIcon, SunIcon, MoonIcon, LogOutIcon } from '../components/icons.jsx'
+import { LayersIcon, BriefcaseIcon, BotIcon, LogOutIcon } from '../components/icons.jsx'
+import SettingsDropdown from '../components/SettingsDropdown.jsx'
 
 const SECTIONS = [
   { id: 'groups', label: 'Группы проектов', subtitle: 'Управление проектными группами', icon: LayersIcon },
@@ -15,22 +15,13 @@ const SECTIONS = [
   { id: 'bots', label: 'Боты', subtitle: 'Учётные записи ботов и их токены', icon: BotIcon },
 ]
 
-function ThemeToggle() {
-  const { isDark, toggleTheme } = useTheme()
-  return (
-    <button type="button" className="theme-btn" aria-label={isDark ? 'Светлая тема' : 'Тёмная тема'} onClick={toggleTheme}>
-      {isDark ? <SunIcon /> : <MoonIcon />}
-    </button>
-  )
-}
-
 function Sidebar({ active, onSelect, stats, onLogout, user }) {
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || ''
 
   return (
     <aside className="sidebar">
       <div className="logo">
-        <div className="logo-mark">A</div>
+        <SettingsDropdown />
         <div className="logo-text">
           AI-Omni
           <span>Админ-панель</span>
@@ -101,9 +92,6 @@ function AdminPanel() {
           <div className="topbar-title">
             <h1>{section.label}</h1>
             <p>{section.subtitle}</p>
-          </div>
-          <div className="topbar-right">
-            <ThemeToggle />
           </div>
         </header>
 

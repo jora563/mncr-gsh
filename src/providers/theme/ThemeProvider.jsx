@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ThemeContext } from './ThemeContext.js';
 import { STORAGE_KEYS, THEMES } from '../../constants.js';
 
-function readSystemTheme() {
+function getSystemTheme() {
   try {
     if (typeof window === 'undefined' || !window.matchMedia) return THEMES.LIGHT;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEMES.DARK : THEMES.LIGHT;
@@ -11,10 +11,17 @@ function readSystemTheme() {
   }
 }
 
+function subscribeSystemTheme(callback) {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', callback);
+  return () => mq.removeEventListener('change', callback);
+}
+
 function readStoredTheme() {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEYS.THEME);
-    if (stored === THEMES.LIGHT || stored === THEMES.DARK) return stored;
+    if (stored === THEMES.LIGHT || stored === THEMES.DARK || stored === THEMES.SYSTEM) return stored;
   } catch {
     // localStorage недоступен — игнорируем
   }
@@ -22,8 +29,8 @@ function readStoredTheme() {
 }
 
 function readInitialTheme() {
-  if (typeof window === 'undefined') return THEMES.LIGHT;
-  return readStoredTheme() ?? readSystemTheme();
+  if (typeof window === 'undefined') return THEMES.SYSTEM;
+  return readStoredTheme() ?? THEMES.SYSTEM;
 }
 
 function persistTheme(theme) {
@@ -36,6 +43,11 @@ function persistTheme(theme) {
 
 export default function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(readInitialTheme);
+  const systemTheme = useSyncExternalStore(
+    subscribeSystemTheme,
+    getSystemTheme,
+    () => THEMES.LIGHT,
+  );
 
   const setTheme = useCallback((next) => {
     setThemeState(next);
@@ -44,33 +56,23 @@ export default function ThemeProvider({ children }) {
 
   const toggleTheme = useCallback(() => {
     setThemeState((current) => {
-      const next = current === THEMES.LIGHT ? THEMES.DARK : THEMES.LIGHT;
+      const effective = current === THEMES.SYSTEM ? getSystemTheme() : current;
+      const next = effective === THEMES.LIGHT ? THEMES.DARK : THEMES.LIGHT;
       persistTheme(next);
       return next;
     });
   }, []);
 
+  const resolvedTheme = theme === THEMES.SYSTEM ? systemTheme : theme;
+
   // Синхронизируем атрибут data-theme на <html>, чтобы работали CSS-селекторы
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  // Реагируем на смену системной темы, если пользователь ещё не выбирал вручную
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (event) => {
-      if (!readStoredTheme()) {
-        setThemeState(event.matches ? THEMES.DARK : THEMES.LIGHT);
-      }
-    };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+  }, [resolvedTheme]);
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme, isDark: theme === THEMES.DARK }),
-    [theme, setTheme, toggleTheme],
+    () => ({ theme, setTheme, toggleTheme, isDark: resolvedTheme === THEMES.DARK }),
+    [theme, setTheme, toggleTheme, resolvedTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
