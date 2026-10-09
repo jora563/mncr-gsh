@@ -166,7 +166,6 @@ export function useOperatorChat() {
     }
     let tempWs = null;
     try {
-      setLoading(true);
       tempWs = new OperatorWebSocket();
 
       tempWs.on(WS_EVENT_TYPES.INCOMING_MESSAGE, (payload) => {
@@ -202,57 +201,110 @@ export function useOperatorChat() {
     } catch (err) {
       toast.error(`Ошибка получения заявки: ${err.message}`);
       if (tempWs) tempWs.disconnect();
-    } finally {
-      setLoading(false);
     }
   }, [toast, setupChatWsState, mainConnectionStatus, handleIncomingMessage, handleMessageHistory, handleMessageSent]);
 
   /**
-   * Восстановление предыдущего чата через НОВОЕ соединение
+   * Восстановление всех активных чатов оператора разом.
+   *
+   * Логика:
+   * 1. Получаем список ID тикетов оператора через GetOperatorsChats.
+   * 2. Фильтруем те, которых ещё нет в activeChats (чтобы не было наслоения).
+   * 3. Для каждого нового тикета создаём отдельное WS-соединение
+   *    и присоединяемся к нему через ChatByIdJoin (а не ChatRestore —
+   *    тот всегда возвращает один и тот же «последний» тикет).
    */
   const restoreChat = useCallback(async () => {
     if (mainConnectionStatus !== WS_CONNECTION_STATUS.CONNECTED) {
       toast.error('Нет подключения к серверу');
       return;
     }
-    let tempWs = null;
+
+    let listWs = null;
     try {
       setLoading(true);
-      tempWs = new OperatorWebSocket();
 
-      tempWs.on(WS_EVENT_TYPES.INCOMING_MESSAGE, (payload) => {
-        if (tempWs.chatId) {
-          const { chatId: msgChatId, ...message } = payload;
-          handleIncomingMessage(msgChatId || tempWs.chatId, message);
+      // Создаём временное соединение только для получения списка тикетов
+      listWs = new OperatorWebSocket();
+      await listWs.connect();
+      await listWs.waitForOpen();
+
+      const listResponse = await listWs.getOperatorsChats();
+      const ticketIds = listResponse.data?.tickets || [];
+
+      listWs.disconnect();
+      listWs = null;
+
+      if (!ticketIds.length) {
+        toast.info('Нет активных заявок для восстановления');
+        return;
+      }
+
+      // Фильтруем те, что уже открыты в панели
+      const currentActive = activeChatsRef.current;
+      const newTicketIds = ticketIds.filter((id) => !currentActive.includes(id));
+
+      if (!newTicketIds.length) {
+        toast.info('Все активные заявки уже открыты');
+        return;
+      }
+
+      // Восстанавливаем каждый чат через отдельное соединение
+      let restoredCount = 0;
+      for (const chatId of newTicketIds) {
+        // Если чат уже есть (успели открыть параллельно) — пропускаем
+        if (activeChatsRef.current.includes(chatId)) {
+          continue;
         }
-      });
-      tempWs.on(WS_EVENT_TYPES.MESSAGE_HISTORY_GOT, (payload) => {
-        if (tempWs.chatId) {
-          const { chatId: msgChatId, messages: history } = payload;
-          handleMessageHistory(msgChatId || tempWs.chatId, history);
+
+        const tempWs = new OperatorWebSocket();
+
+        tempWs.on(WS_EVENT_TYPES.INCOMING_MESSAGE, (payload) => {
+          if (tempWs.chatId) {
+            const { chatId: msgChatId, ...message } = payload;
+            handleIncomingMessage(msgChatId || tempWs.chatId, message);
+          }
+        });
+        tempWs.on(WS_EVENT_TYPES.MESSAGE_HISTORY_GOT, (payload) => {
+          if (tempWs.chatId) {
+            const { chatId: msgChatId, messages: history } = payload;
+            handleMessageHistory(msgChatId || tempWs.chatId, history);
+          }
+        });
+        tempWs.on(WS_EVENT_TYPES.MESSAGE_SENT, (payload) => {
+          if (tempWs.chatId) {
+            handleMessageSent(tempWs.chatId, payload);
+          }
+        });
+
+        try {
+          await tempWs.connect();
+          await tempWs.waitForOpen();
+
+          // Используем ChatByIdJoin — он присоединяется к КОНКРЕТНОМУ тикету
+          const response = await tempWs.joinChatById(chatId);
+          const joinedChatId = response.data?.chatId;
+
+          if (joinedChatId !== null && joinedChatId !== undefined) {
+            setupChatWsState(tempWs, joinedChatId);
+            restoredCount++;
+          } else {
+            tempWs.disconnect();
+          }
+        } catch (err) {
+          toast.error(`Ошибка восстановления заявки №${chatId}: ${err.message}`);
+          tempWs.disconnect();
         }
-      });
-      tempWs.on(WS_EVENT_TYPES.MESSAGE_SENT, (payload) => {
-        if (tempWs.chatId) {
-          handleMessageSent(tempWs.chatId, payload);
-        }
-      });
+      }
 
-      await tempWs.connect();
-      await tempWs.waitForOpen();
-
-      const response = await tempWs.restoreChat();
-      const chatId = response.data?.chatId;
-
-      if (chatId !== null && chatId !== undefined) {
-        setupChatWsState(tempWs, chatId);
+      if (restoredCount > 0) {
+        toast.success(`Восстановлено заявок: ${restoredCount}`);
       } else {
-        toast.info('Нет активной заявки для восстановления');
-        tempWs.disconnect();
+        toast.info('Не удалось восстановить ни одной заявки');
       }
     } catch (err) {
-      toast.error(`Ошибка восстановления заявки: ${err.message}`);
-      if (tempWs) tempWs.disconnect();
+      toast.error(`Ошибка восстановления заявок: ${err.message}`);
+      if (listWs) listWs.disconnect();
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import Modal from '../../components/modals/Modal.jsx';
 import Field from '../../components/forms/Field.jsx';
 import CustomSelect from '../../components/forms/CustomSelect.jsx';
+import MultiSelect from '../../components/forms/MultiSelect.jsx';
 import { useMutation } from '../../hooks/useMutation.js';
 import { useApiQuery } from '../../hooks/useApiQuery.js';
 import * as api from '../../api/index.js';
@@ -24,13 +25,17 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
     [project],
   );
 
+  const fetchPlatforms = useCallback(() => api.getPlatforms(), []);
+
   const { data: llmProject, loading: llmLoading } = useApiQuery(fetchLlmProject);
+  const { data: platforms, loading: platformsLoading } = useApiQuery(fetchPlatforms);
   const llmMissing = !llmLoading && !llmProject;
 
   const [values, setValues] = useState({
     code: project?.code != null ? String(project.code) : '',
     name: project?.project_name ?? '',
     group_id: project?.project_group_id != null ? String(project.project_group_id) : '',
+    platforms: project?.platforms ?? [],
     system_prompt: null,
     fallback_message: null,
   });
@@ -47,9 +52,11 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
       const payload = isEdit
         ? { id: project.id, project_group_id: Number(values.group_id), code: Number(values.code.trim()),
             project_name: values.name.trim(),
+            platforms: values.platforms,
             system_prompt: systemPrompt.trim() === '' ? null : systemPrompt.trim(),
             fallback_message: fallbackMessage.trim() === '' ? null : fallbackMessage.trim() }
         : { group_id: Number(values.group_id), code: Number(values.code.trim()), name: values.name.trim(),
+            platforms: values.platforms,
             system_prompt: systemPrompt.trim() === '' ? null : systemPrompt.trim(),
             fallback_message: fallbackMessage.trim() === '' ? null : fallbackMessage.trim() };
 
@@ -75,6 +82,11 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
       ...groups.map((g) => ({ value: String(g.id), label: g.group_name })),
     ],
     [groups],
+  );
+
+  const platformOptions = useMemo(
+    () => (platforms || []).map((item) => ({ value: item.platform.id, label: item.platform.name })),
+    [platforms],
   );
 
   return (
@@ -103,6 +115,15 @@ export default function ProjectFormModal({ project, groups, onClose, onSaved }) 
             options={groupOptions}
             placeholder="Выберите группу"
             disabled={busy}
+          />
+        </Field>
+        <Field label="Платформы" hint="Платформы, для которых доступен этот проект">
+          <MultiSelect
+            value={values.platforms}
+            onChange={setCustomField('platforms')}
+            options={platformOptions}
+            placeholder="Выберите платформы"
+            disabled={busy || platformsLoading}
           />
         </Field>
         <Field label="Системный промпт" hint="Системный промпт, задающий роль и стиль поведения модели">

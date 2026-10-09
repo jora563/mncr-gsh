@@ -22,6 +22,7 @@ export const WS_REQUEST_TYPES = {
   CHAT_RESTORE: 'ChatRestore',
   CHAT_BY_ID_JOIN: 'ChatByIdJoin',
   IFRAME_GET: 'IFrameGet',
+  GET_OPERATORS_CHATS: 'GetOperatorsChats',
 };
 
 /**
@@ -37,6 +38,7 @@ export const WS_EVENT_TYPES = {
   CHAT_RESTORED: 'ChatRestored',
   CHAT_BY_ID_JOINED: 'ChatByIdJoined',
   IFRAME_GOT: 'IFrameGot',
+  OPERATORS_CHATS_GOT: 'OperatorsChatsGot',
   ERROR: 'Error',
 };
 
@@ -363,6 +365,13 @@ export class OperatorWebSocket {
    */
   restoreChat() {
     return this.sendRequest(WS_REQUEST_TYPES.CHAT_RESTORE, {});
+  }
+
+  /**
+   * Получение списка всех чатов оператора
+   */
+  getOperatorsChats() {
+    return this.sendRequest(WS_REQUEST_TYPES.GET_OPERATORS_CHATS, {});
   }
 
   /**
